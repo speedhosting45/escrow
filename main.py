@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Escrow Bot - Fixed /begin
+Main entry point for the Escrow Bot - Fixed tracking
 """
 import asyncio
 import logging
@@ -10,6 +10,7 @@ from telethon.tl import functions, types
 import json
 import os
 import time
+import re
 
 # Import configuration
 from config import API_ID, API_HASH, BOT_TOKEN, BOT_USERNAME
@@ -67,7 +68,6 @@ def get_user_display(user_obj):
     else:
         name = user_obj.first_name or f"User_{user_obj.id}"
         # Clean special characters
-        import re
         name = re.sub(r'[^\w\s@#]', '', name)
         return name.strip() or f"User_{user_obj.id}"
 
@@ -124,6 +124,37 @@ class EscrowBot:
         async def begin_handler(event):
             await self.handle_begin_command(event)
         
+        # Delete Telegram system messages (group created, user added messages)
+        @self.client.on(events.NewMessage)
+        async def delete_system_messages(event):
+            """Delete Telegram system messages automatically"""
+            try:
+                # Check if message is from Telegram (system message)
+                if event.sender_id == 777000 or event.sender_id == 1087968824:  # Telegram IDs
+                    print(f"🗑️ Deleting system message: {event.text[:50]}...")
+                    await event.delete()
+                    return
+                
+                # Also delete common system message patterns
+                message_text = event.text or ""
+                system_patterns = [
+                    "created the group",
+                    "added ",
+                    "joined the group",
+                    "left the group",
+                    "was added",
+                    "pinned a message"
+                ]
+                
+                if any(pattern in message_text for pattern in system_patterns):
+                    print(f"🗑️ Deleting system-like message: {message_text[:50]}...")
+                    await event.delete()
+                    return
+                    
+            except Exception as e:
+                # Silently ignore errors when deleting messages
+                pass
+        
         # Chat Action Handler for join notifications
         @self.client.on(events.ChatAction())
         async def chat_action_handler(event):
@@ -139,6 +170,14 @@ class EscrowBot:
                         return
                     
                     chat = await event.get_chat()
+                    chat_id = str(chat.id)
+                    
+                    # Convert to string for negative IDs (groups)
+                    if chat_id.startswith('-100'):
+                        # For supergroups, store without -100 prefix for consistency
+                        clean_chat_id = chat_id[4:]
+                    else:
+                        clean_chat_id = chat_id
                     
                     # Skip if bot
                     try:
@@ -148,14 +187,31 @@ class EscrowBot:
                     except:
                         pass
                     
-                    # Get group data
-                    chat_id = str(chat.id)
+                    # Load groups data
                     groups = load_groups()
                     
-                    if chat_id not in groups:
-                        return
+                    # Try to find group by both ID formats
+                    group_data = None
+                    group_key = None
                     
-                    group_data = groups[chat_id]
+                    # Try exact match first
+                    if clean_chat_id in groups:
+                        group_data = groups[clean_chat_id]
+                        group_key = clean_chat_id
+                    elif chat_id in groups:
+                        group_data = groups[chat_id]
+                        group_key = chat_id
+                    else:
+                        # Try to find by group name
+                        for key, data in groups.items():
+                            if data.get("name") == chat.title:
+                                group_data = data
+                                group_key = key
+                                break
+                    
+                    if not group_data:
+                        print(f"❌ Group {clean_chat_id} ({chat.title}) not found in groups data")
+                        return
                     
                     # Initialize members list if not exists
                     if "members" not in group_data:
@@ -166,7 +222,7 @@ class EscrowBot:
                         group_data["members"].append(user_id)
                         
                         # Update group data
-                        groups[chat_id] = group_data
+                        groups[group_key] = group_data
                         save_groups(groups)
                         
                         # Check member count
@@ -195,6 +251,12 @@ class EscrowBot:
                 chat = await event.get_chat()
                 chat_id = str(chat.id)
                 
+                # Clean chat ID for comparison
+                if chat_id.startswith('-100'):
+                    clean_chat_id = chat_id[4:]
+                else:
+                    clean_chat_id = chat_id
+                
                 # Parse role from callback data
                 if data.startswith('role_buyer_'):
                     role = "buyer"
@@ -209,9 +271,19 @@ class EscrowBot:
                 else:
                     return
                 
-                # Check if group_id matches
-                if group_id != chat_id:
-                    return
+                # Check if group_id matches (try both formats)
+                if group_id != clean_chat_id and group_id != chat_id:
+                    # Try to find group by name or other identifier
+                    groups = load_groups()
+                    found = False
+                    for key, data in groups.items():
+                        if key == group_id or data.get("name") == chat.title:
+                            group_id = key
+                            found = True
+                            break
+                    
+                    if not found:
+                        return
                 
                 # Load roles
                 roles = load_user_roles()
@@ -292,13 +364,37 @@ Role cannot be changed.
             user = await event.get_sender()
             chat_id = str(chat.id)
             
+            # Clean chat ID for lookup
+            if chat_id.startswith('-100'):
+                clean_chat_id = chat_id[4:]
+            else:
+                clean_chat_id = chat_id
+            
             # Load groups data
             groups = load_groups()
-            if chat_id not in groups:
-                print(f"❌ Group {chat_id} not found in groups data")
-                return
             
-            group_data = groups[chat_id]
+            # Try both ID formats
+            group_data = None
+            group_key = None
+            
+            if clean_chat_id in groups:
+                group_data = groups[clean_chat_id]
+                group_key = clean_chat_id
+            elif chat_id in groups:
+                group_data = groups[chat_id]
+                group_key = chat_id
+            else:
+                # Try to find by group name
+                for key, data in groups.items():
+                    if data.get("name") == chat.title:
+                        group_data = data
+                        group_key = key
+                        break
+            
+            if not group_data:
+                print(f"❌ Group {clean_chat_id} ({chat.title}) not found in groups data")
+                await event.reply("❌ Group not found in system.")
+                return
             
             # Check if session already initiated
             if group_data.get("session_initiated", False):
@@ -353,8 +449,8 @@ Role selection is final.
                 # Create role selection buttons
                 buttons = [
                     [
-                        Button.inline("Buyer", f"role_buyer_{chat_id}".encode()),
-                        Button.inline("Seller", f"role_seller_{chat_id}".encode())
+                        Button.inline("Buyer", f"role_buyer_{group_key}".encode()),
+                        Button.inline("Seller", f"role_seller_{group_key}".encode())
                     ]
                 ]
                 
@@ -368,7 +464,7 @@ Role selection is final.
                 
                 # Mark session as initiated
                 group_data["session_initiated"] = True
-                groups[chat_id] = group_data
+                groups[group_key] = group_data
                 save_groups(groups)
                 
                 print(f"🚀 Escrow session initiated by {get_user_display(user)} in group: {chat.title}")
@@ -465,9 +561,9 @@ Wallet setup will be handled in next phase.
             print("   /start - Start the bot")
             print("   /begin - Initiate escrow session (in groups)")
             print("\n⚡ Features:")
+            print("   • Auto-delete Telegram system messages")
             print("   • Creator anonymous admin")
-            print("   • Clean group creation (no user addition)")
-            print("   • Auto welcome message pinned")
+            print("   • Clean group creation")
             print("   • Working /begin command")
             print("   • Role selection system")
             print("   • No auto-response to messages")
