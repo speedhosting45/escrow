@@ -1,366 +1,363 @@
 #!/usr/bin/env python3
 """
-Create escrow handlers - Simplified version
+Main entry point for the Escrow Bot
 """
-from telethon.sessions import StringSession
-from telethon.tl import functions, types
-from telethon import Button
-from config import STRING_SESSION1, API_ID, API_HASH
-from telethon import TelegramClient
 import asyncio
+import logging
+import sys
+from telethon import TelegramClient, events
+from telethon.tl import functions, types
 import json
 import os
+import html
 
-# Import types for permissions
-from telethon.tl.types import ChatAdminRights, ChatBannedRights
+# Import configuration
+from config import API_ID, API_HASH, BOT_TOKEN
 
-# Define get_next_number locally
-def get_next_number(group_type="p2p"):
-    """Get next sequential group number"""
-    COUNTER_FILE = 'data/counter.json'
-    try:
-        if os.path.exists(COUNTER_FILE):
-            with open(COUNTER_FILE, 'r') as f:
-                counter = json.load(f)
-        else:
-            counter = {"p2p": 1, "other": 1}
-        
-        number = counter.get(group_type, 1)
-        counter[group_type] = number + 1
-        
-        with open(COUNTER_FILE, 'w') as f:
-            json.dump(counter, f, indent=2)
-        
-        return number
-    except Exception as e:
-        print(f"Error in get_next_number: {e}")
-        return 1
+# Import handlers
+from handlers.start import handle_start
+from handlers.create import handle_create, handle_create_p2p, handle_create_other
+from handlers.stats import handle_stats
+from handlers.about import handle_about
+from handlers.help import handle_help
 
-async def handle_create(event):
-    """
-    Handle create escrow button click
-    """
-    try:
-        from utils.texts import CREATE_MESSAGE
-        from utils.buttons import get_create_buttons
-        
-        await event.edit(
-            CREATE_MESSAGE,
-            buttons=get_create_buttons(),
-            parse_mode='html'
-        )
-    except Exception as e:
-        print(f"Error in create handler: {e}")
-        await event.answer("✅ Create escrow menu", alert=False)
+# Import utilities
+from utils.texts import START_MESSAGE
+from utils.buttons import get_main_menu_buttons
 
-async def handle_create_p2p(event):
-    """
-    Handle P2P deal selection
-    """
-    try:
-        # Show processing
-        await event.edit(
-            "🔄 <b>Creating P2P Escrow Group...</b>\n\n<blockquote>Please wait...</blockquote>",
-            parse_mode='html'
-        )
-        
-        # Get bot username
-        bot_username = (await event.client.get_me()).username
-        
-        # Get group number
-        group_number = get_next_number("p2p")
-        group_name = f"P2P Escrow By @Siyorou #{group_number:02d}"
-        
-        # Create group
-        result = await create_escrow_group(group_name, bot_username, "p2p")
-        
-        if result and "invite_url" in result:
-            from utils.texts import P2P_CREATED_MESSAGE
-            
-            # Create message with join button
-            message = P2P_CREATED_MESSAGE.format(
-                GROUP_NAME=group_name,
-                GROUP_INVITE_LINK=result["invite_url"]
-            )
-            
-            join_button = [
-                [Button.url("🔗 Join Group", result["invite_url"])],
-                [Button.inline("🏠 Main Menu", b"back_to_main")]
-            ]
-            
-            await event.edit(
-                message,
-                parse_mode='html',
-                link_preview=False,
-                buttons=join_button
-            )
-            
-            # Print log to console
-            print("\n" + "="*60)
-            print(f"✅ P2P GROUP CREATED SUCCESSFULLY")
-            print(f"📛 Group Name: {group_name}")
-            print(f"🔗 Initial Invite: {result['invite_url']}")
-            print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
-            print(f"🤖 Bot Added: @{bot_username}")
-            print(f"👑 Creator Promoted: YES (Anonymous)")
-            print(f"⚠️ Link auto-revoke: AFTER 2 USERS JOIN")
-            print("="*60 + "\n")
-            
-            # Store group data for tracking
-            store_group_data(result["group_id"], group_name, "p2p")
-            
-        else:
-            await event.edit(
-                "❌ <b>Failed to create group</b>\n\n<blockquote>Please try again later</blockquote>",
-                parse_mode='html',
-                buttons=[Button.inline("🔄 Try Again", b"create")]
-            )
-            
-    except Exception as e:
-        print(f"Error in P2P handler: {e}")
-        await event.edit(
-            "❌ <b>Error creating group</b>\n\n<blockquote>Please try again</blockquote>",
-            parse_mode='html',
-            buttons=[Button.inline("🔄 Try Again", b"create")]
-        )
+# Setup logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
-async def handle_create_other(event):
-    """
-    Handle Other deal selection
-    """
-    try:
-        # Show processing
-        await event.edit(
-            "🔄 <b>Creating Other Deal Escrow Group...</b>\n\n<blockquote>Please wait...</blockquote>",
-            parse_mode='html'
-        )
-        
-        # Get bot username
-        bot_username = (await event.client.get_me()).username
-        
-        # Get group number
-        group_number = get_next_number("other")
-        group_name = f"Other Deal Escrow #{group_number:02d}"
-        
-        # Create group
-        result = await create_escrow_group(group_name, bot_username, "other")
-        
-        if result and "invite_url" in result:
-            from utils.texts import OTHER_CREATED_MESSAGE
-            
-            # Create message with join button
-            message = OTHER_CREATED_MESSAGE.format(
-                GROUP_NAME=group_name,
-                GROUP_INVITE_LINK=result["invite_url"]
-            )
-            
-            join_button = [
-                [Button.url("🔗 Join Group", result["invite_url"])],
-                [Button.inline("🏠 Main Menu", b"back_to_main")]
-            ]
-            
-            await event.edit(
-                message,
-                parse_mode='html',
-                link_preview=False,
-                buttons=join_button
-            )
-            
-            # Print log to console
-            print("\n" + "="*60)
-            print(f"✅ OTHER DEAL GROUP CREATED SUCCESSFULLY")
-            print(f"📛 Group Name: {group_name}")
-            print(f"🔗 Initial Invite: {result['invite_url']}")
-            print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
-            print(f"🤖 Bot Added: @{bot_username}")
-            print(f"👑 Creator Promoted: YES (Anonymous)")
-            print(f"⚠️ Link auto-revoke: AFTER 2 USERS JOIN")
-            print("="*60 + "\n")
-            
-            # Store group data for tracking
-            store_group_data(result["group_id"], group_name, "other")
-            
-        else:
-            await event.edit(
-                "❌ <b>Failed to create group</b>\n\n<blockquote>Please try again later</blockquote>",
-                parse_mode='html',
-                buttons=[Button.inline("🔄 Try Again", b"create")]
-            )
-            
-    except Exception as e:
-        print(f"Error in Other deal handler: {e}")
-        await event.edit(
-            "❌ <b>Error creating group</b>\n\n<blockquote>Please try again</blockquote>",
-            parse_mode='html',
-            buttons=[Button.inline("🔄 Try Again", b"create")]
-        )
+# Track groups for invite management
+GROUPS_FILE = 'data/active_groups.json'
 
-async def create_escrow_group(group_name, bot_username, group_type):
-    """
-    Create a supergroup, add bot, and promote creator as anonymous admin
-    """
-    if not STRING_SESSION1:
-        print("❌ STRING_SESSION1 not configured in .env")
-        return None
+def load_groups():
+    """Load active groups data"""
+    if os.path.exists(GROUPS_FILE):
+        with open(GROUPS_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_groups(groups):
+    """Save active groups data"""
+    with open(GROUPS_FILE, 'w') as f:
+        json.dump(groups, f, indent=2)
+
+def sanitize_text(text):
+    """Remove markdown and clean text for HTML display"""
+    if not text:
+        return "User"
     
-    user_client = None
-    try:
-        # Start user client (creator's account)
-        user_client = TelegramClient(StringSession(STRING_SESSION1), API_ID, API_HASH)
-        await user_client.start()
+    # Remove markdown brackets and other formatting
+    text = str(text)
+    text = html.escape(text)  # Escape HTML
+    text = text.replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+    text = text.replace('*', '').replace('_', '').replace('`', '').replace('~', '')
+    
+    # Remove any remaining special characters that break formatting
+    text = ''.join(char for char in text if ord(char) < 128 or char.isspace())
+    
+    return text.strip() or "User"
+
+class EscrowBot:
+    def __init__(self):
+        self.client = TelegramClient('escrow_bot', API_ID, API_HASH)
+        self.setup_handlers()
+    
+    def setup_handlers(self):
+        """Setup all event handlers"""
         
-        print(f"✅ User client started (Creator)")
-        print(f"🔄 Creating group: {group_name}")
+        @self.client.on(events.NewMessage(pattern='/start'))
+        async def start_handler(event):
+            await handle_start(event)
         
-        # Get bot entity
-        bot_entity = await user_client.get_entity(bot_username)
-        print(f"✅ Got bot entity: @{bot_username}")
+        @self.client.on(events.CallbackQuery(pattern=b'create'))
+        async def create_handler(event):
+            await handle_create(event)
         
-        # Get creator's own entity
-        creator = await user_client.get_me()
-        print(f"✅ Creator: @{creator.username if creator.username else creator.id}")
+        @self.client.on(events.CallbackQuery(pattern=b'create_p2p'))
+        async def create_p2p_handler(event):
+            await handle_create_p2p(event)
         
-        # Create supergroup
-        created = await user_client(functions.channels.CreateChannelRequest(
-            title=group_name,
-            about=f"Secure {group_type.upper()} Escrow Group",
-            megagroup=True,
-            broadcast=False
-        ))
+        @self.client.on(events.CallbackQuery(pattern=b'create_other'))
+        async def create_other_handler(event):
+            await handle_create_other(event)
         
-        # Get channel info
-        chat = created.chats[0]
-        chat_id = chat.id
-        channel = types.InputPeerChannel(channel_id=chat.id, access_hash=chat.access_hash)
-        print(f"✅ Supergroup created: {chat_id}")
+        @self.client.on(events.CallbackQuery(pattern=b'stats'))
+        async def stats_handler(event):
+            await handle_stats(event)
         
-        # CREATOR: Promote self as anonymous admin
-        print("🔄 Promoting creator as anonymous admin...")
-        try:
-            await user_client(functions.channels.EditAdminRequest(
-                channel=channel,
-                user_id=creator,
-                admin_rights=ChatAdminRights(
-                    change_info=True,
-                    post_messages=True,
-                    edit_messages=True,
-                    delete_messages=True,
-                    ban_users=True,
-                    invite_users=True,
-                    pin_messages=True,
-                    add_admins=True,  # Can add other admins
-                    anonymous=True,   # CRITICAL: Creator is anonymous
-                    manage_call=True,
-                    other=True
-                ),
-                rank="Owner"
-            ))
-            print(f"✅ Creator promoted as ANONYMOUS admin")
-        except Exception as e:
-            print(f"⚠️ Could not promote creator as anonymous: {e}")
-            # Try without anonymous flag
+        @self.client.on(events.CallbackQuery(pattern=b'about'))
+        async def about_handler(event):
+            await handle_about(event)
+        
+        @self.client.on(events.CallbackQuery(pattern=b'help'))
+        async def help_handler(event):
+            await handle_help(event)
+        
+        @self.client.on(events.CallbackQuery(pattern=b'back_to_main'))
+        async def back_handler(event):
             try:
-                await user_client(functions.channels.EditAdminRequest(
-                    channel=channel,
-                    user_id=creator,
-                    admin_rights=ChatAdminRights(
+                await event.edit(
+                    START_MESSAGE,
+                    buttons=get_main_menu_buttons(),
+                    parse_mode='html'
+                )
+            except Exception as e:
+                logger.error(f"Error in back handler: {e}")
+                await event.answer("❌ An error occurred.", alert=True)
+        
+        @self.client.on(events.NewMessage)
+        async def message_handler(event):
+            """Handle other messages"""
+            if event.text and not event.text.startswith('/'):
+                try:
+                    await event.respond(
+                        "Please use the buttons below to navigate:",
+                        buttons=get_main_menu_buttons()
+                    )
+                except Exception as e:
+                    logger.error(f"Error in message handler: {e}")
+        
+        # Chat Action Handler for join notifications
+        @self.client.on(events.ChatAction())
+        async def chat_action_handler(event):
+            """
+            Handle user joins to groups where bot is admin
+            """
+            try:
+                # Check if it's a user join event
+                if event.user_joined or event.user_added:
+                    # Get the user who joined
+                    user = await event.get_user()
+                    chat = await event.get_chat()
+                    
+                    # Clean and sanitize the user's name
+                    user_name = user.first_name or "User"
+                    clean_name = sanitize_text(user_name)
+                    
+                    # Use username if available, otherwise use cleaned name
+                    if user.username:
+                        mention = f"@{user.username}"
+                    else:
+                        mention = clean_name
+                    
+                    # Send clean join notification
+                    join_message = f"<b>USER {mention} JOINED THE GROUP!</b>"
+                    await event.respond(
+                        join_message,
+                        parse_mode='html'
+                    )
+                    
+                    # Log to console
+                    print(f"\n👤 USER {user.id} ({clean_name}) JOINED GROUP: {chat.title}")
+                    
+                    # Update join count and check for link revocation
+                    await self.update_join_count(chat, user)
+                    
+            except Exception as e:
+                print(f"Error in chat action handler: {e}")
+    
+    async def update_join_count(self, chat, new_user):
+        """Update join count and revoke link if needed"""
+        try:
+            chat_id = str(chat.id)
+            groups = load_groups()
+            
+            if chat_id in groups:
+                group_data = groups[chat_id]
+                
+                # Initialize joins if not exists
+                if "joins" not in group_data:
+                    group_data["joins"] = 0
+                if "members" not in group_data:
+                    group_data["members"] = []
+                
+                # Don't count the creator or bot
+                if (new_user.id != group_data.get("creator_id") and 
+                    not new_user.bot and 
+                    new_user.id not in group_data["members"]):
+                    
+                    group_data["joins"] += 1
+                    group_data["members"].append(new_user.id)
+                    print(f"📊 Group {chat.title}: {group_data['joins']} user(s) joined")
+                
+                # If 2 real users joined (not counting creator/bot)
+                if group_data["joins"] >= 2 and not group_data.get("link_revoked", False):
+                    print(f"🔒 REVOKING invite link for group {chat.title}")
+                    
+                    # REVOKE the invite link (delete it)
+                    revoked = await self.revoke_invite_link(chat)
+                    
+                    if revoked:
+                        # Mark as revoked
+                        group_data["link_revoked"] = True
+                        group_data["revoked_at"] = asyncio.get_event_loop().time()
+                        
+                        # Save updated data
+                        groups[chat_id] = group_data
+                        save_groups(groups)
+                        
+                        # Send notification WITHOUT new link
+                        await self.client.send_message(
+                            chat,
+                            "⚠️ <b>SECURITY UPDATE</b>\n\n"
+                            "<blockquote>Invite link has been revoked and deleted.\n"
+                            "No new links will be generated.</blockquote>",
+                            parse_mode='html'
+                        )
+                        print(f"✅ Link revoked for group: {chat.title}")
+                    else:
+                        print(f"❌ Failed to revoke link for group: {chat.title}")
+                
+                # Save updated count
+                groups[chat_id] = group_data
+                save_groups(groups)
+                
+        except Exception as e:
+            print(f"Error updating join count: {e}")
+    
+    async def revoke_invite_link(self, chat):
+        """Revoke and delete the current invite link"""
+        try:
+            # First, disable invite permissions for everyone
+            await self.client(functions.messages.EditChatDefaultBannedRightsRequest(
+                peer=chat,
+                banned_rights=types.ChatBannedRights(
+                    until_date=0,
+                    invite_users=True  # Disable inviting users for everyone
+                )
+            ))
+            
+            # Try to get and delete any existing invite links
+            try:
+                # Get all invite links
+                result = await self.client(functions.messages.GetExportedChatInvitesRequest(
+                    peer=chat,
+                    admin_id=await self.client.get_me(),
+                    limit=100
+                ))
+                
+                if hasattr(result, 'invites') and result.invites:
+                    for invite in result.invites:
+                        try:
+                            # Delete the invite link
+                            await self.client(functions.messages.DeleteExportedChatInviteRequest(
+                                peer=chat,
+                                link=invite.link
+                            ))
+                            print(f"🗑️ Deleted invite link: {invite.link}")
+                        except Exception as e:
+                            print(f"⚠️ Could not delete link {invite.link}: {e}")
+                else:
+                    print(f"ℹ️ No existing invite links found for {chat.title}")
+                    
+            except Exception as e:
+                print(f"⚠️ Could not get existing invites: {e}")
+            
+            # Also disable admin's ability to create new invites
+            try:
+                # Get bot's current admin rights
+                me = await self.client.get_me()
+                
+                # Update bot's admin rights to remove invite permission
+                await self.client(functions.channels.EditAdminRequest(
+                    channel=chat,
+                    user_id=me,
+                    admin_rights=types.ChatAdminRights(
                         change_info=True,
                         post_messages=True,
                         edit_messages=True,
                         delete_messages=True,
                         ban_users=True,
-                        invite_users=True,
+                        invite_users=False,  # CRITICAL: Disable invite permission
                         pin_messages=True,
-                        add_admins=True,
+                        add_admins=False,
                         anonymous=False,
                         manage_call=True,
                         other=True
                     ),
-                    rank="Owner"
+                    rank="Bot Admin"
                 ))
-                print(f"✅ Creator promoted as regular admin")
-            except Exception as e2:
-                print(f"❌ Could not promote creator at all: {e2}")
-        
-        # Add bot to group
-        print("🔄 Adding bot to group...")
-        await user_client(functions.channels.InviteToChannelRequest(
-            channel=channel,
-            users=[bot_entity]
-        ))
-        print(f"✅ Bot added to group")
-        
-        # Promote bot as admin (not anonymous)
-        print("🔄 Promoting bot as admin...")
-        await user_client(functions.channels.EditAdminRequest(
-            channel=channel,
-            user_id=bot_entity,
-            admin_rights=ChatAdminRights(
-                change_info=True,
-                post_messages=True,
-                edit_messages=True,
-                delete_messages=True,
-                ban_users=True,
-                invite_users=True,
-                pin_messages=True,
-                add_admins=False,  # Bot cannot add admins
-                anonymous=False,   # Bot is not anonymous
-                manage_call=True,
-                other=True
-            ),
-            rank="Bot Admin"
-        ))
-        print(f"✅ Bot promoted as admin")
-        
-        # Create initial invite link (will be revoked after 2 users)
-        print("🔄 Creating initial invite link...")
-        invite_link = await user_client(functions.messages.ExportChatInviteRequest(
-            peer=channel
-        ))
-        invite_url = str(invite_link.link)
-        print(f"✅ Initial invite link created (will auto-revoke after 2 users)")
-        
-        # Return result
-        return {
-            "group_id": chat_id,
-            "invite_url": invite_url,
-            "group_name": group_name,
-            "creator_id": creator.id
-        }
-        
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
-        
-    finally:
-        if user_client and user_client.is_connected():
-            await user_client.disconnect()
-            print(f"✅ User client disconnected")
-
-def store_group_data(group_id, group_name, group_type):
-    """Store group data for tracking joins"""
-    try:
-        GROUPS_FILE = 'data/active_groups.json'
-        groups = {}
-        
-        if os.path.exists(GROUPS_FILE):
-            with open(GROUPS_FILE, 'r') as f:
-                groups = json.load(f)
-        
-        groups[str(group_id)] = {
-            "name": group_name,
-            "type": group_type,
-            "joins": 0,
-            "link_revoked": False,
-            "created_at": asyncio.get_event_loop().time()
-        }
-        
-        with open(GROUPS_FILE, 'w') as f:
-            json.dump(groups, f, indent=2)
+                print(f"🔒 Disabled bot's invite permission for {chat.title}")
+            except Exception as e:
+                print(f"⚠️ Could not update bot permissions: {e}")
             
-        print(f"✅ Group data stored for tracking: {group_id}")
-        
-    except Exception as e:
-        print(f"Error storing group data: {e}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error revoking link: {e}")
+            return False
+
+    async def run(self):
+        """Run the bot"""
+        try:
+            print("🔐 Secure Escrow Bot Starting...")
+            
+            # Check config
+            if not API_ID or not API_HASH or not BOT_TOKEN:
+                print("❌ Missing configuration in .env file")
+                print("Please set API_ID, API_HASH, and BOT_TOKEN")
+                sys.exit(1)
+            
+            # Start the client
+            await self.client.start(bot_token=BOT_TOKEN)
+            
+            # Get bot info
+            me = await self.client.get_me()
+            
+            print(f"✅ Bot is running as @{me.username}")
+            print(f"🤖 Bot ID: {me.id}")
+            print(f"📛 Name: {me.first_name}")
+            
+            print("\n📋 Available Commands:")
+            print("   /start - Start the bot")
+            print("   📊 Stats - View statistics")
+            print("   ➕ Create - Create new escrow")
+            print("   ℹ️ About - About the bot")
+            print("   ❓ Help - Help and support")
+            print("\n⚡ Security Features:")
+            print("   • Creator auto-promotion (anonymous)")
+            print("   • Auto link revocation after 2 users")
+            print("   • NO NEW LINKS generated")
+            print("   • Clean join announcements")
+            print("\n⚡ Bot is listening for messages...")
+            print("   Press Ctrl+C to stop")
+            
+            # Run until disconnected
+            await self.client.run_until_disconnected()
+            
+        except KeyboardInterrupt:
+            print("\n👋 Bot stopped by user")
+        except Exception as e:
+            logger.error(f"Error running bot: {e}")
+            print(f"\n❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            print("\n🔴 Bot shutdown complete")
+
+def main():
+    """Main function"""
+    bot = EscrowBot()
+    
+    try:
+        # Run the bot with proper event loop handling
+        asyncio.run(bot.run())
+    except RuntimeError as e:
+        if "Event loop is closed" in str(e):
+            # This is expected when stopping the bot
+            print("\n👋 Bot stopped")
+        else:
+            print(f"\n❌ Unexpected error: {e}")
+            import traceback
+            traceback.print_exc()
+    except KeyboardInterrupt:
+        print("\n👋 Bot stopped by user")
+
+if __name__ == '__main__':
+    main()
