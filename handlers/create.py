@@ -354,6 +354,8 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
             await user_client.disconnect()
             print(f"✅ User client disconnected")
 
+# In the store_group_data function, update to store clean IDs:
+
 def store_group_data(group_id, group_name, group_type, creator_id, bot_username):
     """Store group data for tracking"""
     try:
@@ -364,11 +366,17 @@ def store_group_data(group_id, group_name, group_type, creator_id, bot_username)
             with open(GROUPS_FILE, 'r') as f:
                 groups = json.load(f)
         
-        groups[str(group_id)] = {
+        # Clean group ID (remove -100 prefix for supergroups)
+        clean_group_id = str(group_id)
+        if clean_group_id.startswith('-100'):
+            clean_group_id = clean_group_id[4:]
+        
+        groups[clean_group_id] = {
             "name": group_name,
             "type": group_type,
             "creator_id": creator_id,
             "bot_username": bot_username,
+            "original_id": str(group_id),  # Store original for reference
             "members": [],  # Start empty, will be filled when users join
             "welcome_pinned": True,
             "session_initiated": False,  # Track if /begin has been used
@@ -378,7 +386,7 @@ def store_group_data(group_id, group_name, group_type, creator_id, bot_username)
         with open(GROUPS_FILE, 'w') as f:
             json.dump(groups, f, indent=2)
             
-        print(f"✅ Group data stored for tracking: {group_id}")
+        print(f"✅ Group data stored: {clean_group_id} ({group_name})")
         
     except Exception as e:
         print(f"Error storing group data: {e}")
