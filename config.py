@@ -12,6 +12,9 @@ BOT_TOKEN = os.getenv('BOT_TOKEN', '')
 # User session for group creation
 STRING_SESSION1 = os.getenv('STRING_SESSION1', '')
 
+# Bot username (will be set dynamically)
+BOT_USERNAME = ""
+
 # Ensure data directory exists
 os.makedirs('data', exist_ok=True)
 
@@ -36,4 +39,9 @@ def get_next_number(group_type="p2p"):
         return number
     except Exception as e:
         print(f"Error in get_next_number: {e}")
-        return 1  # Default to 1 if error
+        return 1
+
+def set_bot_username(username):
+    """Set bot username globally"""
+    global BOT_USERNAME
+    BOT_USERNAME = username
