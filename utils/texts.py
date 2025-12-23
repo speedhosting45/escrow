@@ -99,45 +99,28 @@ To initiate this deal:
 WELCOME_MESSAGE = """
 🤝 <b>Welcome to P2P Escrow by @{bot_username}</b>
 
-To initiate this deal:
-<code>/begin</code>
+<blockquote>To initiate this deal: /begin</blockquote>
 """
 
 # Simplified session message (no extra spaces)
 SESSION_INITIATED_MESSAGE = """
 <b>🔐 @{bot_username} P2P Escrow Session Initiated</b>
 
-Participants: {participants_display}
+<b>Participants:</b> {participants_display}
 
 This escrow session is governed by verified rules.
 
 <b>Please declare your role:</b>
+<code>Buyer</code> or <code>Seller</code>
 
-<code>
-Buyer  → Select Buyer role
-Seller → Select Seller role
-</code>
-
-<b>Important:</b>
-Role selection is final.
+<b>Important:</b> Role selection is final.
 """
+
 
 # Simplified role confirmations (no "locked" word)
-BUYER_CONFIRMED_MESSAGE = """
-<b>Buyer Role Confirmed</b>
+BUYER_CONFIRMED_MESSAGE = "✅ <a href=\"tg://user?id={buyer_id}\">{buyer_name}</a> registered as <b>Buyer</b>."
 
-<a href="tg://user?id={buyer_id}">{buyer_name}</a> registered as <b>Buyer</b>.
-
-Role cannot be changed.
-"""
-
-SELLER_CONFIRMED_MESSAGE = """
-<b>Seller Role Confirmed</b>
-
-<a href="tg://user?id={seller_id}">{seller_name}</a> registered as <b>Seller</b>.
-
-Role cannot be changed.
-"""
+SELLER_CONFIRMED_MESSAGE = "✅ <a href=\"tg://user?id={seller_id}\">{seller_name}</a> registered as <b>Seller</b>."
 
 # Simplified alerts
 ROLE_ALREADY_CHOSEN_MESSAGE = """
