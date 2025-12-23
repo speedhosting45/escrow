@@ -11,7 +11,10 @@ import asyncio
 import json
 import os
 
-# Define get_next_number locally if import fails
+# Import types for permissions
+from telethon.tl.types import ChatAdminRights, ChatBannedRights
+
+# Define get_next_number locally
 def get_next_number(group_type="p2p"):
     """Get next sequential group number"""
     COUNTER_FILE = 'data/counter.json'
@@ -94,13 +97,18 @@ async def handle_create_p2p(event):
             
             # Print log to console
             print("\n" + "="*60)
-            print(f"✅ GROUP CREATED SUCCESSFULLY")
+            print(f"✅ P2P GROUP CREATED SUCCESSFULLY")
             print(f"📛 Group Name: {group_name}")
-            print(f"🔗 Invite Link: {result['invite_url']}")
+            print(f"🔗 Initial Invite: {result['invite_url']}")
             print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
             print(f"🤖 Bot Added: @{bot_username}")
-            print(f"👑 Bot Promoted: YES")
+            print(f"👑 Creator Promoted: YES (Anonymous)")
+            print(f"⚠️ Link auto-revoke: AFTER 2 USERS JOIN")
             print("="*60 + "\n")
+            
+            # Store group data for tracking
+            store_group_data(result["group_id"], group_name, "p2p")
+            
         else:
             await event.edit(
                 "❌ <b>Failed to create group</b>\n\n<blockquote>Please try again later</blockquote>",
@@ -162,11 +170,16 @@ async def handle_create_other(event):
             print("\n" + "="*60)
             print(f"✅ OTHER DEAL GROUP CREATED SUCCESSFULLY")
             print(f"📛 Group Name: {group_name}")
-            print(f"🔗 Invite Link: {result['invite_url']}")
+            print(f"🔗 Initial Invite: {result['invite_url']}")
             print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
             print(f"🤖 Bot Added: @{bot_username}")
-            print(f"👑 Bot Promoted: YES")
+            print(f"👑 Creator Promoted: YES (Anonymous)")
+            print(f"⚠️ Link auto-revoke: AFTER 2 USERS JOIN")
             print("="*60 + "\n")
+            
+            # Store group data for tracking
+            store_group_data(result["group_id"], group_name, "other")
+            
         else:
             await event.edit(
                 "❌ <b>Failed to create group</b>\n\n<blockquote>Please try again later</blockquote>",
@@ -184,7 +197,7 @@ async def handle_create_other(event):
 
 async def create_escrow_group(group_name, bot_username, group_type):
     """
-    Create a supergroup, add bot, and promote it
+    Create a supergroup, add bot, and promote creator as anonymous admin
     """
     if not STRING_SESSION1:
         print("❌ STRING_SESSION1 not configured in .env")
@@ -192,16 +205,20 @@ async def create_escrow_group(group_name, bot_username, group_type):
     
     user_client = None
     try:
-        # Start user client
+        # Start user client (creator's account)
         user_client = TelegramClient(StringSession(STRING_SESSION1), API_ID, API_HASH)
         await user_client.start()
         
-        print(f"✅ User client started")
+        print(f"✅ User client started (Creator)")
         print(f"🔄 Creating group: {group_name}")
         
         # Get bot entity
         bot_entity = await user_client.get_entity(bot_username)
         print(f"✅ Got bot entity: @{bot_username}")
+        
+        # Get creator's own entity
+        creator = await user_client.get_me()
+        print(f"✅ Creator: @{creator.username if creator.username else creator.id}")
         
         # Create supergroup
         created = await user_client(functions.channels.CreateChannelRequest(
@@ -217,6 +234,54 @@ async def create_escrow_group(group_name, bot_username, group_type):
         channel = types.InputPeerChannel(channel_id=chat.id, access_hash=chat.access_hash)
         print(f"✅ Supergroup created: {chat_id}")
         
+        # CREATOR: Promote self as anonymous admin
+        print("🔄 Promoting creator as anonymous admin...")
+        try:
+            await user_client(functions.channels.EditAdminRequest(
+                channel=channel,
+                user_id=creator,
+                admin_rights=ChatAdminRights(
+                    change_info=True,
+                    post_messages=True,
+                    edit_messages=True,
+                    delete_messages=True,
+                    ban_users=True,
+                    invite_users=True,
+                    pin_messages=True,
+                    add_admins=True,  # Can add other admins
+                    anonymous=True,   # CRITICAL: Creator is anonymous
+                    manage_call=True,
+                    other=True
+                ),
+                rank="Owner"
+            ))
+            print(f"✅ Creator promoted as ANONYMOUS admin")
+        except Exception as e:
+            print(f"⚠️ Could not promote creator as anonymous: {e}")
+            # Try without anonymous flag
+            try:
+                await user_client(functions.channels.EditAdminRequest(
+                    channel=channel,
+                    user_id=creator,
+                    admin_rights=ChatAdminRights(
+                        change_info=True,
+                        post_messages=True,
+                        edit_messages=True,
+                        delete_messages=True,
+                        ban_users=True,
+                        invite_users=True,
+                        pin_messages=True,
+                        add_admins=True,
+                        anonymous=False,
+                        manage_call=True,
+                        other=True
+                    ),
+                    rank="Owner"
+                ))
+                print(f"✅ Creator promoted as regular admin")
+            except Exception as e2:
+                print(f"❌ Could not promote creator at all: {e2}")
+        
         # Add bot to group
         print("🔄 Adding bot to group...")
         await user_client(functions.channels.InviteToChannelRequest(
@@ -225,12 +290,12 @@ async def create_escrow_group(group_name, bot_username, group_type):
         ))
         print(f"✅ Bot added to group")
         
-        # Promote bot as admin
+        # Promote bot as admin (not anonymous)
         print("🔄 Promoting bot as admin...")
         await user_client(functions.channels.EditAdminRequest(
             channel=channel,
             user_id=bot_entity,
-            admin_rights=types.ChatAdminRights(
+            admin_rights=ChatAdminRights(
                 change_info=True,
                 post_messages=True,
                 edit_messages=True,
@@ -238,26 +303,29 @@ async def create_escrow_group(group_name, bot_username, group_type):
                 ban_users=True,
                 invite_users=True,
                 pin_messages=True,
-                add_admins=False,
-                anonymous=False
+                add_admins=False,  # Bot cannot add admins
+                anonymous=False,   # Bot is not anonymous
+                manage_call=True,
+                other=True
             ),
             rank="Bot Admin"
         ))
         print(f"✅ Bot promoted as admin")
         
-        # Create invite link
-        print("🔄 Creating invite link...")
+        # Create initial invite link (will be revoked after 2 users)
+        print("🔄 Creating initial invite link...")
         invite_link = await user_client(functions.messages.ExportChatInviteRequest(
             peer=channel
         ))
         invite_url = str(invite_link.link)
-        print(f"✅ Invite link created")
+        print(f"✅ Initial invite link created (will auto-revoke after 2 users)")
         
         # Return result
         return {
             "group_id": chat_id,
             "invite_url": invite_url,
-            "group_name": group_name
+            "group_name": group_name,
+            "creator_id": creator.id
         }
         
     except Exception as e:
@@ -270,3 +338,29 @@ async def create_escrow_group(group_name, bot_username, group_type):
         if user_client and user_client.is_connected():
             await user_client.disconnect()
             print(f"✅ User client disconnected")
+
+def store_group_data(group_id, group_name, group_type):
+    """Store group data for tracking joins"""
+    try:
+        GROUPS_FILE = 'data/active_groups.json'
+        groups = {}
+        
+        if os.path.exists(GROUPS_FILE):
+            with open(GROUPS_FILE, 'r') as f:
+                groups = json.load(f)
+        
+        groups[str(group_id)] = {
+            "name": group_name,
+            "type": group_type,
+            "joins": 0,
+            "link_revoked": False,
+            "created_at": asyncio.get_event_loop().time()
+        }
+        
+        with open(GROUPS_FILE, 'w') as f:
+            json.dump(groups, f, indent=2)
+            
+        print(f"✅ Group data stored for tracking: {group_id}")
+        
+    except Exception as e:
+        print(f"Error storing group data: {e}")
