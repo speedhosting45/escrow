@@ -1,25 +1,46 @@
 import asyncio
+import sys
+import os
 from telethon import TelegramClient, events
-from telethon.errors import SessionPasswordNeededError
+
+# Add current directory to path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Import configuration
-from config import API_ID, API_HASH, BOT_TOKEN
-
-# Import handlers
-from handlers.start import handle_start
-from handlers.create import handle_create, handle_create_p2p, handle_create_other
-from handlers.stats import handle_stats
-from handlers.about import handle_about
-from handlers.help import handle_help
+try:
+    from config import API_ID, API_HASH, BOT_TOKEN
+except ImportError:
+    print("❌ Error: config.py not found. Please create it from .env.example")
+    sys.exit(1)
 
 # Import utilities
-from utils.texts import START_MESSAGE
-from utils.buttons import get_main_menu_buttons
+try:
+    from utils.texts import START_MESSAGE
+    from utils.buttons import get_main_menu_buttons
+except ImportError as e:
+    print(f"❌ Error importing utilities: {e}")
+    sys.exit(1)
 
 # Initialize the client
-bot = TelegramClient('escrow_bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
-
 print("🔐 Secure Escrow Bot Starting...")
+
+try:
+    bot = TelegramClient('escrow_bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+except Exception as e:
+    print(f"❌ Failed to start bot: {e}")
+    print("Please check your API_ID, API_HASH, and BOT_TOKEN in .env file")
+    sys.exit(1)
+
+# Import handlers after bot is initialized
+try:
+    from handlers.start import handle_start
+    from handlers.create import handle_create, handle_create_p2p, handle_create_other
+    from handlers.stats import handle_stats
+    from handlers.about import handle_about
+    from handlers.help import handle_help
+except ImportError as e:
+    print(f"❌ Error importing handlers: {e}")
+    sys.exit(1)
 
 @bot.on(events.NewMessage(pattern='/start'))
 async def start_handler(event):
@@ -102,3 +123,5 @@ if __name__ == '__main__':
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n👋 Bot stopped.")
+    except Exception as e:
+        print(f"\n❌ Error: {e}")
