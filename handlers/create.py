@@ -3,7 +3,7 @@
 Create escrow handlers
 """
 from telethon.sessions import StringSession
-from telethon.tl import functions
+from telethon.tl import functions, types
 from telethon.errors import MessageNotModifiedError
 from utils.texts import CREATE_MESSAGE, P2P_CREATED_MESSAGE
 from utils.buttons import get_create_buttons, get_main_menu_buttons
@@ -46,51 +46,44 @@ async def handle_create_p2p(event):
     Handle P2P deal selection - create private group
     """
     try:
-        # Delete the "Creating..." popup after a delay
-        await event.delete()
-        
-        # Show processing message
-        processing_msg = await event.respond(
-            "🔄 Creating P2P escrow group... Please wait."
+        # Edit the original message to show "creating" status
+        await event.edit(
+            "🔄 <b>Creating P2P Escrow Group...</b>\n\n<blockquote>Please wait while we set up your secure escrow group</blockquote>",
+            parse_mode='html'
         )
         
         user_id = event.sender_id
         group_link = await create_p2p_group(user_id, event.client)
         
-        # Delete processing message
-        await processing_msg.delete()
-        
         # Send success message with group link
         if group_link:
             message = P2P_CREATED_MESSAGE.format(GROUP_INVITE_LINK=group_link)
-            
-            # Try to edit the original message first
-            try:
-                await event.edit(
-                    message,
-                    parse_mode='html',
-                    link_preview=False
-                )
-            except (MessageNotModifiedError, ValueError):
-                # If can't edit, send as new message
-                await event.respond(
-                    message,
-                    parse_mode='html',
-                    link_preview=False,
-                    buttons=get_main_menu_buttons()
-                )
+            await event.edit(
+                message,
+                parse_mode='html',
+                link_preview=False
+            )
         else:
-            try:
-                await event.answer("❌ Failed to create group. Please try again.", alert=True)
-            except:
-                await event.respond("❌ Failed to create group. Please try again.")
+            # Restore original create menu on failure
+            await event.edit(
+                CREATE_MESSAGE,
+                buttons=get_create_buttons(),
+                parse_mode='html'
+            )
+            await event.answer("❌ Failed to create group. Please try again.", alert=True)
             
     except Exception as e:
         print(f"Error in P2P handler: {e}")
+        # Restore original menu on error
         try:
+            await event.edit(
+                CREATE_MESSAGE,
+                buttons=get_create_buttons(),
+                parse_mode='html'
+            )
             await event.answer("❌ An error occurred. Please try again.", alert=True)
         except:
-            await event.respond("❌ An error occurred. Please try again.")
+            pass
 
 async def create_p2p_group(user_id, bot_client):
     """
@@ -104,6 +97,7 @@ async def create_p2p_group(user_id, bot_client):
         print("❌ API_ID or API_HASH not configured")
         return None
     
+    user_client = None
     try:
         # Create user client using the session string
         user_client = TelegramClient(
@@ -115,81 +109,92 @@ async def create_p2p_group(user_id, bot_client):
         await user_client.start()
         print(f"✅ User client started for group creation")
         
-        # Create the private group
-        group_name = "P2P Escrow By @Siyorou #01"
-        
-        # First, get the user entity
+        # Get the user entity
         try:
             user_entity = await user_client.get_entity(user_id)
-            users_to_add = [user_entity]
-        except:
-            users_to_add = [user_id]
+        except Exception as e:
+            print(f"⚠️ Could not get user entity: {e}")
+            # Use InputPeerUser as fallback
+            user_entity = types.InputPeerUser(user_id=user_id, access_hash=0)
         
-        group = await user_client.create_group(
-            title=group_name,
-            users=users_to_add
-        )
-        print(f"✅ Group created: {group_name}")
+        # Create the private group using messages.CreateChatRequest
+        group_name = "P2P Escrow By @Siyorou #01"
+        
+        # First, create the chat
+        created = await user_client(functions.messages.CreateChatRequest(
+            users=[user_entity],
+            title=group_name
+        ))
+        
+        # Extract the chat ID from the result
+        chat_id = created.chats[0].id
+        print(f"✅ Group created: {group_name} (ID: {chat_id})")
+        
+        # Get the chat entity
+        chat_entity = await user_client.get_entity(chat_id)
         
         # Get the bot's entity
         bot_me = await bot_client.get_me()
         
         # Add the bot to the group
         try:
-            await user_client.add_participants(group, bot_me.username)
+            bot_entity = await user_client.get_entity(bot_me.username)
+            await user_client(functions.messages.AddChatUserRequest(
+                chat_id=chat_id,
+                user_id=bot_entity,
+                fwd_limit=100  # Number of recent messages to forward
+            ))
             print(f"✅ Bot added to group")
         except Exception as e:
             print(f"⚠️ Could not add bot: {e}")
-            # Continue anyway
+            # Continue anyway - group is still created
         
-        # Promote bot as admin - FIXED: removed duplicate add_admins parameter
+        # Promote bot as admin
         try:
-            # Get the bot's participant entity in the group
-            participants = await user_client.get_participants(group)
+            # First, we need to get the bot participant in the chat
+            # Get full chat info
+            full_chat = await user_client(functions.messages.GetFullChatRequest(
+                chat_id=chat_id
+            ))
+            
+            # Find bot participant
             bot_participant = None
-            for participant in participants:
-                if participant.id == bot_me.id:
+            for participant in full_chat.full_chat.participants.participants:
+                if hasattr(participant, 'user_id') and participant.user_id == bot_me.id:
                     bot_participant = participant
                     break
             
             if bot_participant:
-                # Set bot as admin - CORRECTED VERSION
-                await user_client.edit_admin(
-                    group,
-                    bot_participant,
-                    is_admin=True,
-                    change_info=True,
-                    post_messages=True,
-                    edit_messages=True,
-                    delete_messages=True,
-                    ban_users=True,
-                    invite_users=True,
-                    pin_messages=True
-                )
+                # Promote bot as admin using EditChatAdminRequest
+                await user_client(functions.messages.EditChatAdminRequest(
+                    chat_id=chat_id,
+                    user_id=bot_entity,
+                    is_admin=True
+                ))
                 print(f"✅ Bot promoted as admin")
         except Exception as e:
             print(f"⚠️ Could not promote bot as admin: {e}")
+            # Some chats might not support admin promotion
         
         # Create invite link
         try:
-            invite_link = await user_client(
-                functions.messages.ExportChatInviteRequest(
-                    peer=group
-                )
-            )
+            invite_link = await user_client(functions.messages.ExportChatInviteRequest(
+                peer=chat_entity
+            ))
             invite_url = str(invite_link.link)
             print(f"✅ Invite link created: {invite_url}")
         except Exception as e:
             print(f"⚠️ Could not create invite link: {e}")
-            # Get the group link as fallback
+            # Create a basic invite link as fallback
             try:
-                entity = await user_client.get_entity(group)
-                invite_url = f"https://t.me/c/{entity.id}"
+                # Try to get the chat's username for public link
+                if hasattr(chat_entity, 'username') and chat_entity.username:
+                    invite_url = f"https://t.me/{chat_entity.username}"
+                else:
+                    # For private chats/groups
+                    invite_url = f"https://t.me/c/{str(chat_id).replace('-100', '')}"
             except:
-                invite_url = "Group created but could not get invite link"
-        
-        # Disconnect user client
-        await user_client.disconnect()
+                invite_url = f"Group created successfully! ID: {chat_id}"
         
         return invite_url
         
@@ -198,6 +203,11 @@ async def create_p2p_group(user_id, bot_client):
         import traceback
         traceback.print_exc()
         return None
+    finally:
+        # Always disconnect user client
+        if user_client and user_client.is_connected():
+            await user_client.disconnect()
+            print(f"✅ User client disconnected")
 
 async def handle_create_other(event):
     """
@@ -210,4 +220,12 @@ async def handle_create_other(event):
         )
     except Exception as e:
         print(f"Error in Other deal handler: {e}")
-        await event.respond("📦 Other Deal selected! This feature is coming soon...")
+        # Fallback to editing message if answer fails
+        try:
+            await event.edit(
+                "<b>📦 Other Deal</b>\n\n<blockquote>This feature is coming soon...</blockquote>",
+                parse_mode='html',
+                buttons=get_main_menu_buttons()
+            )
+        except:
+            pass
