@@ -77,6 +77,93 @@ A secure escrow solution built for Telegram
 
 More features coming soon 🚀
 """
+# Add these new text templates to your existing texts.py
+
+ROLE_SELECTION_MESSAGE = """
+<b>👋 Welcome!</b>
+
+<blockquote>
+Participants:
+• {user1}  
+• {user2}
+</blockquote>
+
+<b>Please choose your role:</b>
+🛒 Buyer  
+💼 Seller  
+
+<blockquote>
+⚠️ <b>Note:</b> Once a role is selected, it <b>cannot be changed</b>.
+</blockquote>
+"""
+
+WALLET_SETUP_MESSAGE = """
+<b>✅ Roles Are Confirmed</b>
+
+<blockquote>
+<b>Buyer:</b> {buyer_name}  
+<b>Seller:</b> {seller_name}
+</blockquote>
+
+<b>Please set your wallets to continue:</b>
+
+<code>
+Buyer  : /buyer {{buyer_wallet_address}}
+Seller : /seller {{seller_wallet_address}}
+</code>
+
+<blockquote>
+⚠️ Make sure the wallet addresses are correct.
+Once submitted, they <b>cannot be changed</b>.
+</blockquote>
+"""
+
+ESCROW_READY_MESSAGE = """
+🎉 <b>ESCROW READY TO START!</b> 🎉
+
+<blockquote>
+✅ <b>All Requirements Met</b> ✅
+</blockquote>
+
+════════════════════════════════════
+
+<b>👤 PARTICIPANTS:</b>
+🛒 <b>Buyer:</b> {buyer_name}
+💰 <b>Seller:</b> {seller_name}
+
+════════════════════════════════════
+
+<b>🔗 WALLET ADDRESSES:</b>
+• <b>Buyer Wallet:</b> <code>{buyer_wallet}</code>
+• <b>Seller Wallet:</b> <code>{seller_wallet}</code>
+
+════════════════════════════════════
+
+<b>📝 NEXT STEPS:</b>
+1. Buyer sends funds to escrow
+2. Seller confirms item/service delivery
+3. Buyer confirms receipt
+4. Funds released to seller
+
+<blockquote>
+⚠️ <b>IMPORTANT:</b> All communications and transactions should happen in this group for transparency and security.
+</blockquote>
+
+🔒 <b>SECURE ESCROW ACTIVE</b>
+"""
+
+WALLET_SAVED_MESSAGE = """
+✅ {role} wallet address saved!
+
+<code>{wallet_preview}</code>
+
+{status_message}
+"""
+
+BUYER_ONLY_MESSAGE = "❌ Only the buyer can set the buyer wallet address."
+SELLER_ONLY_MESSAGE = "❌ Only the seller can set the seller wallet address."
+NO_ROLE_MESSAGE = "❌ You haven't selected a role in this group yet."
+INVALID_WALLET_MESSAGE = "❌ Wallet address seems too short. Please check and try again."
 
 HELP_MESSAGE = """
 <b>❓ Help & Support</b>
