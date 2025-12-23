@@ -95,15 +95,23 @@ To initiate this deal:
 """
 
 # Session initiation message
+# Simplified messages
+WELCOME_MESSAGE = """
+🤝 <b>Welcome to P2P Escrow by @{bot_username}</b>
+
+To initiate this deal:
+<code>/begin</code>
+"""
+
+# Simplified session message (no extra spaces)
 SESSION_INITIATED_MESSAGE = """
 <b>🔐 @{bot_username} P2P Escrow Session Initiated</b>
 
-Participants:
-<a href="tg://user?id={user1_id}">{user1_name}</a> • <a href="tg://user?id={user2_id}">{user2_name}</a>
+Participants: {participants_display}
 
-This escrow session is governed by verified rules to ensure a fair and secure trade.
+This escrow session is governed by verified rules.
 
-<b>Please declare your role to proceed:</b>
+<b>Please declare your role:</b>
 
 <code>
 Buyer  → Select Buyer role
@@ -111,42 +119,38 @@ Seller → Select Seller role
 </code>
 
 <b>Important:</b>
-Role selection is final and cannot be modified once confirmed.
+Role selection is final.
 """
 
-# Buyer role confirmation
+# Simplified role confirmations (no "locked" word)
 BUYER_CONFIRMED_MESSAGE = """
 <b>Buyer Role Confirmed</b>
 
-<a href="tg://user?id={buyer_id}">{buyer_name}</a> has been registered as the <b>Buyer</b> for this escrow session.
+<a href="tg://user?id={buyer_id}">{buyer_name}</a> registered as <b>Buyer</b>.
 
-This role is now <b>locked</b> and cannot be changed.
+Role cannot be changed.
 """
 
-# Seller role confirmation  
 SELLER_CONFIRMED_MESSAGE = """
 <b>Seller Role Confirmed</b>
 
-<a href="tg://user?id={seller_id}">{seller_name}</a> has been registered as the <b>Seller</b> for this escrow session.
+<a href="tg://user?id={seller_id}">{seller_name}</a> registered as <b>Seller</b>.
 
-This role is now <b>locked</b> and cannot be changed.
+Role cannot be changed.
 """
 
-# Role already chosen (same user)
+# Simplified alerts
 ROLE_ALREADY_CHOSEN_MESSAGE = """
-⛔ Role Already Chosen (Blocked)
-Action denied.
-
-Your role has already been declared and cannot be changed.
+⛔ Role Already Chosen
+Your role has already been declared.
 """
 
-# Role already taken (other user)
 ROLE_ALREADY_TAKEN_MESSAGE = """
 ⚠️ Role Already Taken
-This role has already been assigned.
-
-Please select the remaining available role.
+Please select the remaining role.
 """
+
+# Keep other templates as is
 
 # Wallet setup message
 WALLET_SETUP_MESSAGE = """
