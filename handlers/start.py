@@ -1,10 +1,4 @@
 from telethon import events
-import sys
-import os
-
-# Add parent directory to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from utils.texts import START_MESSAGE
 from utils.buttons import get_main_menu_buttons
 
