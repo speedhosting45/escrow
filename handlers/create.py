@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create escrow handlers - Simplified version
+Create escrow handlers - Updated version
 """
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
@@ -62,12 +62,13 @@ async def handle_create_p2p(event):
             parse_mode='html'
         )
         
-        # Get bot username
-        bot_username = (await event.client.get_me()).username
+        # Get bot info
+        bot = await event.client.get_me()
+        bot_username = bot.username
         
         # Get group number
         group_number = get_next_number("p2p")
-        group_name = f"P2P Escrow By @Siyorou #{group_number:02d}"
+        group_name = f"ESCROW P2P BY @{bot_username} #{group_number:02d}"
         
         # Create group
         result = await create_escrow_group(group_name, bot_username, "p2p")
@@ -75,15 +76,15 @@ async def handle_create_p2p(event):
         if result and "invite_url" in result:
             from utils.texts import P2P_CREATED_MESSAGE
             
-            # Create message with join button
+            # Create message with ONLY join button
             message = P2P_CREATED_MESSAGE.format(
                 GROUP_NAME=group_name,
                 GROUP_INVITE_LINK=result["invite_url"]
             )
             
+            # Only show join button, no main menu
             join_button = [
-                [Button.url("🔗 Join Group", result["invite_url"])],
-                [Button.inline("🏠 Main Menu", b"back_to_main")]
+                [Button.url("🔗 Join Group Now", result["invite_url"])]
             ]
             
             await event.edit(
@@ -100,8 +101,8 @@ async def handle_create_p2p(event):
             print(f"🔗 Initial Invite: {result['invite_url']}")
             print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
             print(f"🤖 Bot Added: @{bot_username}")
-            print(f"👑 Creator Promoted: YES (Anonymous)")
-            print(f"⚠️ Link auto-revoke: AFTER 2 USERS JOIN")
+            print(f"👑 Creator Promoted: YES")
+            print(f"⚠️ Invite auto-delete: AFTER 2 USERS JOIN")
             print("="*60 + "\n")
             
             # Store group data for tracking
@@ -133,12 +134,13 @@ async def handle_create_other(event):
             parse_mode='html'
         )
         
-        # Get bot username
-        bot_username = (await event.client.get_me()).username
+        # Get bot info
+        bot = await event.client.get_me()
+        bot_username = bot.username
         
         # Get group number
         group_number = get_next_number("other")
-        group_name = f"Other Deal Escrow #{group_number:02d}"
+        group_name = f"OTHER DEAL #{group_number:02d}"
         
         # Create group
         result = await create_escrow_group(group_name, bot_username, "other")
@@ -146,15 +148,15 @@ async def handle_create_other(event):
         if result and "invite_url" in result:
             from utils.texts import OTHER_CREATED_MESSAGE
             
-            # Create message with join button
+            # Create message with ONLY join button
             message = OTHER_CREATED_MESSAGE.format(
                 GROUP_NAME=group_name,
                 GROUP_INVITE_LINK=result["invite_url"]
             )
             
+            # Only show join button, no main menu
             join_button = [
-                [Button.url("🔗 Join Group", result["invite_url"])],
-                [Button.inline("🏠 Main Menu", b"back_to_main")]
+                [Button.url("🔗 Join Group Now", result["invite_url"])]
             ]
             
             await event.edit(
@@ -171,8 +173,8 @@ async def handle_create_other(event):
             print(f"🔗 Initial Invite: {result['invite_url']}")
             print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
             print(f"🤖 Bot Added: @{bot_username}")
-            print(f"👑 Creator Promoted: YES (Anonymous)")
-            print(f"⚠️ Link auto-revoke: AFTER 2 USERS JOIN")
+            print(f"👑 Creator Promoted: YES")
+            print(f"⚠️ Invite auto-delete: AFTER 2 USERS JOIN")
             print("="*60 + "\n")
             
             # Store group data for tracking
@@ -195,7 +197,7 @@ async def handle_create_other(event):
 
 async def create_escrow_group(group_name, bot_username, group_type):
     """
-    Create a supergroup, add bot, and promote creator as anonymous admin
+    Create a supergroup, add bot, and promote creator
     """
     if not STRING_SESSION1:
         print("❌ STRING_SESSION1 not configured in .env")
@@ -232,54 +234,6 @@ async def create_escrow_group(group_name, bot_username, group_type):
         channel = types.InputPeerChannel(channel_id=chat.id, access_hash=chat.access_hash)
         print(f"✅ Supergroup created: {chat_id}")
         
-        # CREATOR: Promote self as anonymous admin
-        print("🔄 Promoting creator as anonymous admin...")
-        try:
-            await user_client(functions.channels.EditAdminRequest(
-                channel=channel,
-                user_id=creator,
-                admin_rights=ChatAdminRights(
-                    change_info=True,
-                    post_messages=True,
-                    edit_messages=True,
-                    delete_messages=True,
-                    ban_users=True,
-                    invite_users=True,
-                    pin_messages=True,
-                    add_admins=True,  # Can add other admins
-                    anonymous=True,   # CRITICAL: Creator is anonymous
-                    manage_call=True,
-                    other=True
-                ),
-                rank="Owner"
-            ))
-            print(f"✅ Creator promoted as ANONYMOUS admin")
-        except Exception as e:
-            print(f"⚠️ Could not promote creator as anonymous: {e}")
-            # Try without anonymous flag
-            try:
-                await user_client(functions.channels.EditAdminRequest(
-                    channel=channel,
-                    user_id=creator,
-                    admin_rights=ChatAdminRights(
-                        change_info=True,
-                        post_messages=True,
-                        edit_messages=True,
-                        delete_messages=True,
-                        ban_users=True,
-                        invite_users=True,
-                        pin_messages=True,
-                        add_admins=True,
-                        anonymous=False,
-                        manage_call=True,
-                        other=True
-                    ),
-                    rank="Owner"
-                ))
-                print(f"✅ Creator promoted as regular admin")
-            except Exception as e2:
-                print(f"❌ Could not promote creator at all: {e2}")
-        
         # Add bot to group
         print("🔄 Adding bot to group...")
         await user_client(functions.channels.InviteToChannelRequest(
@@ -288,7 +242,7 @@ async def create_escrow_group(group_name, bot_username, group_type):
         ))
         print(f"✅ Bot added to group")
         
-        # Promote bot as admin (not anonymous)
+        # Promote bot as admin
         print("🔄 Promoting bot as admin...")
         await user_client(functions.channels.EditAdminRequest(
             channel=channel,
@@ -301,22 +255,22 @@ async def create_escrow_group(group_name, bot_username, group_type):
                 ban_users=True,
                 invite_users=True,
                 pin_messages=True,
-                add_admins=False,  # Bot cannot add admins
-                anonymous=False,   # Bot is not anonymous
+                add_admins=False,
+                anonymous=False,
                 manage_call=True,
                 other=True
             ),
-            rank="Bot Admin"
+            rank="Escrow Bot"
         ))
         print(f"✅ Bot promoted as admin")
         
-        # Create initial invite link (will be revoked after 2 users)
+        # Create initial invite link
         print("🔄 Creating initial invite link...")
         invite_link = await user_client(functions.messages.ExportChatInviteRequest(
             peer=channel
         ))
         invite_url = str(invite_link.link)
-        print(f"✅ Initial invite link created (will auto-revoke after 2 users)")
+        print(f"✅ Initial invite link created")
         
         # Return result
         return {
@@ -351,8 +305,6 @@ def store_group_data(group_id, group_name, group_type, creator_id=None):
             "name": group_name,
             "type": group_type,
             "creator_id": creator_id,
-            "joins": 0,
-            "link_revoked": False,
             "members": [],
             "created_at": asyncio.get_event_loop().time()
         }
