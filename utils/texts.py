@@ -35,6 +35,15 @@ CREATE_MESSAGE = """
 Select the type of deal you want to create
 </blockquote>
 """
+# Add this new template to texts.py
+
+ROLE_ANNOUNCEMENT_MESSAGE = """
+{mention} declared as {role_emoji} <b>{role_name}</b>
+
+<blockquote>
+👥 Status: Buyers: {buyer_count} | Sellers: {seller_count}
+</blockquote>
+"""
 
 STATS_MESSAGE = """
 <b>📊 Your Stats</b>
