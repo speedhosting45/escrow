@@ -46,6 +46,8 @@ def load_groups():
 
 def save_groups(groups):
     """Save active groups data"""
+    # Ensure data directory exists
+    os.makedirs('data', exist_ok=True)
     with open(GROUPS_FILE, 'w') as f:
         json.dump(groups, f, indent=2)
 
@@ -58,6 +60,8 @@ def load_user_roles():
 
 def save_user_roles(roles):
     """Save user roles data"""
+    # Ensure data directory exists
+    os.makedirs('data', exist_ok=True)
     with open(USER_ROLES_FILE, 'w') as f:
         json.dump(roles, f, indent=2)
 
@@ -67,6 +71,8 @@ def get_user_display(user_obj):
         return f"@{user_obj.username}"
     else:
         name = user_obj.first_name or f"User_{user_obj.id}"
+        if user_obj.last_name:
+            name = f"{name} {user_obj.last_name}"
         # Clean special characters
         name = re.sub(r'[^\w\s@#]', '', name)
         return name.strip() or f"User_{user_obj.id}"
@@ -125,80 +131,78 @@ class EscrowBot:
             await self.handle_begin_command(event)
         
         # Delete Telegram system messages AND track user joins
-        # Update the handle_all_messages function in main.py:
-
-@self.client.on(events.NewMessage)
-async def handle_all_messages(event):
-    """Handle all messages: delete system messages and track user joins"""
-    try:
-        message_text = event.text or ""
-        chat = await event.get_chat()
-        chat_id = str(chat.id)
-        
-        # Clean chat ID for lookup
-        if chat_id.startswith('-100'):
-            clean_chat_id = chat_id[4:]
-        else:
-            clean_chat_id = chat_id
-        
-        # 1. DELETE DUPLICATE /BEGIN MESSAGES
-        if message_text == '/begin':
-            # Check if session already initiated
-            groups = load_groups()
-            
-            # Try both ID formats
-            group_data = None
-            if clean_chat_id in groups:
-                group_data = groups[clean_chat_id]
-            elif chat_id in groups:
-                group_data = groups[chat_id]
-            else:
-                # Try to find by group name
-                for key, data in groups.items():
-                    if data.get("name") == chat.title:
-                        group_data = data
-                        break
-            
-            # If session already initiated, DELETE the /begin message
-            if group_data and group_data.get("session_initiated", False):
-                print(f"🗑️ Deleting duplicate /begin from {event.sender_id}")
-                await event.delete()
-                return
-        
-        # 2. DELETE SYSTEM MESSAGES
-        system_patterns = [
-            "created the group",
-            "added ",
-            "joined the group via invite link",
-            "left the group",
-            "was added",
-            "pinned a message"
-        ]
-        
-        is_system_message = False
-        # Check if from Telegram or contains system patterns
-        if event.sender_id == 777000 or event.sender_id == 1087968824:
-            is_system_message = True
-        elif any(pattern in message_text.lower() for pattern in system_patterns):
-            is_system_message = True
-        
-        if is_system_message:
-            print(f"🗑️ Deleting system message: {message_text[:50]}...")
-            await event.delete()
-            
-            # 3. TRACK USER JOINS FROM SYSTEM MESSAGES
-            if "joined the group via invite link" in message_text or "was added" in message_text:
-                await self.track_user_join_from_message(message_text, chat, clean_chat_id)
-            
-            return
-        
-        # 4. Handle /begin command normally (if not deleted)
-        if message_text == '/begin':
-            await self.handle_begin_command(event)
-        
-    except Exception as e:
-        # Silently ignore errors
-        pass
+        @self.client.on(events.NewMessage)
+        async def handle_all_messages(event):
+            """Handle all messages: delete system messages and track user joins"""
+            try:
+                message_text = event.text or ""
+                chat = await event.get_chat()
+                chat_id = str(chat.id)
+                
+                # Clean chat ID for lookup
+                if chat_id.startswith('-100'):
+                    clean_chat_id = chat_id[4:]
+                else:
+                    clean_chat_id = chat_id
+                
+                # 1. DELETE DUPLICATE /BEGIN MESSAGES
+                if message_text == '/begin':
+                    # Check if session already initiated
+                    groups = load_groups()
+                    
+                    # Try both ID formats
+                    group_data = None
+                    if clean_chat_id in groups:
+                        group_data = groups[clean_chat_id]
+                    elif chat_id in groups:
+                        group_data = groups[chat_id]
+                    else:
+                        # Try to find by group name
+                        for key, data in groups.items():
+                            if data.get("name") == chat.title:
+                                group_data = data
+                                break
+                    
+                    # If session already initiated, DELETE the /begin message
+                    if group_data and group_data.get("session_initiated", False):
+                        print(f"🗑️ Deleting duplicate /begin from {event.sender_id}")
+                        await event.delete()
+                        return
+                
+                # 2. DELETE SYSTEM MESSAGES
+                system_patterns = [
+                    "created the group",
+                    "added ",
+                    "joined the group via invite link",
+                    "left the group",
+                    "was added",
+                    "pinned a message"
+                ]
+                
+                is_system_message = False
+                # Check if from Telegram or contains system patterns
+                if event.sender_id == 777000 or event.sender_id == 1087968824:
+                    is_system_message = True
+                elif any(pattern in message_text.lower() for pattern in system_patterns):
+                    is_system_message = True
+                
+                if is_system_message:
+                    print(f"🗑️ Deleting system message: {message_text[:50]}...")
+                    await event.delete()
+                    
+                    # 3. TRACK USER JOINS FROM SYSTEM MESSAGES
+                    if "joined the group via invite link" in message_text or "was added" in message_text:
+                        await self.track_user_join_from_message(message_text, chat, clean_chat_id)
+                    
+                    return
+                
+                # 4. Handle /begin command normally (if not deleted)
+                if message_text == '/begin':
+                    await self.handle_begin_command(event)
+                
+            except Exception as e:
+                # Silently ignore errors
+                pass
         
         # Handle role selection buttons
         @self.client.on(events.CallbackQuery(pattern=rb'role_'))
@@ -263,7 +267,7 @@ async def handle_all_messages(event):
                     return
                 
                 # Check if role is already taken by someone else
-                role_taken = any(u["role"] == role for u in roles[group_id].values())
+                role_taken = any(u.get("role") == role for u in roles[group_id].values())
                 if role_taken:
                     await event.answer(
                         "⚠️ Role Already Taken\nPlease select the remaining role.",
@@ -310,8 +314,8 @@ Role cannot be changed.
                 print(f"✅ {get_user_display(sender)} selected as {role_name} in group: {chat.title}")
                 
                 # Check if both roles are selected
-                buyer_count = sum(1 for u in roles[group_id].values() if u["role"] == "buyer")
-                seller_count = sum(1 for u in roles[group_id].values() if u["role"] == "seller")
+                buyer_count = sum(1 for u in roles[group_id].values() if u.get("role") == "buyer")
+                seller_count = sum(1 for u in roles[group_id].values() if u.get("role") == "seller")
                 
                 # When both buyer and seller have selected roles
                 if buyer_count >= 1 and seller_count >= 1:
@@ -345,10 +349,6 @@ Role cannot be changed.
             
             if not group_data:
                 return
-            
-            # Parse user ID from message (this is simplified)
-            # In real implementation, you'd need to extract user info from message
-            # For now, we'll get actual participants count
             
             # Get actual participants from Telegram
             try:
@@ -536,9 +536,9 @@ Role selection is final.
             seller = None
             
             for user_id, data in user_roles.items():
-                if data["role"] == "buyer" and not buyer:
+                if data.get("role") == "buyer" and not buyer:
                     buyer = data
-                elif data["role"] == "seller" and not seller:
+                elif data.get("role") == "seller" and not seller:
                     seller = data
             
             if not buyer or not seller:
@@ -639,8 +639,12 @@ def main():
     bot = EscrowBot()
     
     try:
+        # Create data directory
+        os.makedirs('data', exist_ok=True)
+        
         # Run the bot with proper event loop handling
-        asyncio.run(bot.run())
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(bot.run())
     except RuntimeError as e:
         if "Event loop is closed" in str(e):
             # This is expected when stopping the bot
