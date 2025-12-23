@@ -32,6 +32,21 @@ Escrow statistics will appear here soon
 • Disputes: 0  
 • Success Rate: 0%
 """
+P2P_CREATED_MESSAGE = """
+<b>🤝 P2P Escrow Created</b>
+
+<blockquote>
+Your private escrow group has been created successfully
+</blockquote>
+
+• Group Name: <b>P2P Escrow By @Siyorou #01</b>  
+• Type: <b>P2P Deal</b>  
+
+Please continue your deal inside the group.
+
+🔗 <b>Group Link:</b>  
+<a href="{GROUP_INVITE_LINK}">{GROUP_INVITE_LINK}</a>
+"""
 
 ABOUT_MESSAGE = """
 <b>ℹ️ About This Bot</b>
