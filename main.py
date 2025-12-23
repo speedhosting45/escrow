@@ -67,15 +67,11 @@ def sanitize_text(text):
         return "User"
     
     text = str(text)
-    # Remove markdown and special characters
+    # Remove markdown and special characters but keep emojis
     text = html.escape(text)
-    text = text.replace('[', '').replace(']', '').replace('(', '').replace(')', '')
-    text = text.replace('*', '').replace('_', '').replace('`', '').replace('~', '')
-    
-    # Take only first 20 characters if too long
-    if len(text) > 20:
-        text = text[:20] + "..."
-    
+    # Remove problematic characters but keep normal text
+    import re
+    text = re.sub(r'[^\w\s@#:.!?\-]', '', text)
     return text.strip() or "User"
 
 class EscrowBot:
@@ -147,13 +143,20 @@ class EscrowBot:
             try:
                 # Check if it's a user join event
                 if event.user_joined or event.user_added:
-                    # Get the user who joined
-                    user = await event.get_user()
+                    # Get the user who joined - FIXED METHOD
+                    user = event.user_id
+                    if not user:
+                        return
+                    
                     chat = await event.get_chat()
                     
-                    # Skip if bot or creator
-                    if user.bot:
-                        return
+                    # Skip if bot
+                    try:
+                        user_obj = await event.client.get_entity(user)
+                        if user_obj.bot:
+                            return
+                    except:
+                        pass
                     
                     # Get group data
                     chat_id = str(chat.id)
@@ -169,14 +172,18 @@ class EscrowBot:
                         group_data["members"] = []
                     
                     # Add user if not already in list
-                    if user.id not in group_data["members"]:
-                        group_data["members"].append(user.id)
+                    if user not in group_data["members"]:
+                        group_data["members"].append(user)
                         
                         # Get user display name
-                        if user.username:
-                            display_name = f"@{user.username}"
-                        else:
-                            display_name = user.first_name or f"User_{user.id}"
+                        try:
+                            user_obj = await event.client.get_entity(user)
+                            if user_obj.username:
+                                display_name = f"@{user_obj.username}"
+                            else:
+                                display_name = user_obj.first_name or f"User_{user}"
+                        except:
+                            display_name = f"User_{user}"
                         
                         # Clean display name
                         clean_display = sanitize_text(display_name)
@@ -191,23 +198,28 @@ class EscrowBot:
                         
                         # When 2 real users join, send role selection
                         if member_count == 2:
-                            await self.send_role_selection(chat, group_data)
+                            await self.send_role_selection(event.client, chat, group_data)
                         
                         # When 2 users join, delete invite link
                         if member_count >= 2:
-                            await self.delete_invite_link(chat)
+                            await self.delete_invite_link(event.client, chat)
                     
             except Exception as e:
                 print(f"Error in chat action handler: {e}")
         
-        # Handle role selection buttons
-        @self.client.on(events.CallbackQuery(pattern=b'role_'))
+        # Handle role selection buttons - FIXED VERSION
+        @self.client.on(events.CallbackQuery(pattern=rb'role_'))
         async def role_handler(event):
             """Handle role selection (buyer/seller)"""
             try:
+                # Get the user who clicked - FIXED METHOD
+                sender = await event.get_sender()
+                if not sender:
+                    await event.answer("❌ Cannot identify user", alert=True)
+                    return
+                
                 data = event.data.decode('utf-8')
                 chat = await event.get_chat()
-                user = await event.get_user()
                 
                 # Parse role from callback data
                 if data.startswith('role_buyer_'):
@@ -220,10 +232,11 @@ class EscrowBot:
                     return
                 
                 # Get user display
-                if user.username:
-                    mention = f"@{user.username}"
+                if sender.username:
+                    mention = f"@{sender.username}"
                 else:
-                    mention = user.first_name or f"User_{user.id}"
+                    mention = sender.first_name or f"User_{sender.id}"
+                clean_mention = sanitize_text(mention)
                 
                 # Load roles
                 roles = load_user_roles()
@@ -231,9 +244,9 @@ class EscrowBot:
                     roles[group_id] = {}
                 
                 # Save user's role
-                roles[group_id][str(user.id)] = {
+                roles[group_id][str(sender.id)] = {
                     "role": role,
-                    "name": mention,
+                    "name": clean_mention,
                     "selected_at": time.time()
                 }
                 save_user_roles(roles)
@@ -249,28 +262,33 @@ class EscrowBot:
                     
                     # Send update message
                     if role == "buyer":
-                        role_text = "BUYER"
+                        role_text = "🛒 BUYER"
+                        emoji = "🛒"
                     else:
-                        role_text = "SELLER"
+                        role_text = "💰 SELLER"
+                        emoji = "💰"
                     
-                    await event.respond(
-                        f"✅ <b>{mention} declared as {role_text}</b>\n\n"
-                        f"<blockquote>Buyers: {buyer_count} | Sellers: {seller_count}</blockquote>",
+                    await event.client.send_message(
+                        chat,
+                        f"{emoji} <b>{clean_mention} declared as {role_text}</b>\n\n"
+                        f"<blockquote>👥 Status: Buyers: {buyer_count} | Sellers: {seller_count}</blockquote>",
                         parse_mode='html'
                     )
                     
                     # Check if both roles are selected
                     if buyer_count >= 1 and seller_count >= 1:
-                        await self.send_trade_started(chat, group_id, roles[group_id])
+                        await self.send_trade_started(event.client, chat, group_id, roles[group_id])
                 
-                await event.answer(f"You selected: {role}", alert=False)
+                await event.answer(f"✅ You selected: {role}", alert=False)
                 
             except Exception as e:
                 print(f"Error in role handler: {e}")
+                import traceback
+                traceback.print_exc()
                 await event.answer("❌ Error selecting role", alert=True)
     
-    async def send_role_selection(self, chat, group_data):
-        """Send role selection message when 2 users join"""
+    async def send_role_selection(self, client, chat, group_data):
+        """Send BIG role selection message when 2 users join"""
         try:
             chat_id = str(chat.id)
             
@@ -281,42 +299,65 @@ class EscrowBot:
             user_mentions = []
             for user_id in members:
                 try:
-                    user = await self.client.get_entity(user_id)
+                    user = await client.get_entity(user_id)
                     if user.username:
                         mention = f"@{user.username}"
                     else:
-                        mention = user.first_name or f"User_{user.id}"
-                    user_mentions.append(mention)
+                        mention = user.first_name or f"User_{user_id}"
+                    clean_mention = sanitize_text(mention)
+                    user_mentions.append(clean_mention)
                 except:
                     user_mentions.append(f"User_{user_id}")
             
-            # Create message with mentions
-            mentions_text = ", ".join(user_mentions)
+            # Create BIG welcome message with mentions
+            mentions_text = " 👈 AND 👉 ".join(user_mentions)
             
-            # Create role selection buttons
+            # Create BIG role selection buttons
             buttons = [
                 [
-                    Button.inline("🛒 I AM BUYER", f"role_buyer_{chat_id}".encode()),
-                    Button.inline("💰 I AM SELLER", f"role_seller_{chat_id}".encode())
+                    Button.inline("I AM BUYER", f"role_buyer_{chat_id}".encode())
+                ],
+                [
+                    Button.inline("I AM SELLER", f"role_seller_{chat_id}".encode())
                 ]
             ]
             
-            # Send role selection message
-            await self.client.send_message(
+            # Send BIG role selection message
+            welcome_text = f"""
+🎊🎊🎊 <b>WELCOME TO ESCROW GROUP!</b> 🎊🎊🎊
+
+<blockquote>
+🌟 <b>TRADE PARTNERS HAVE ARRIVED!</b> 🌟
+</blockquote>
+
+✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨
+
+👥 <b>PARTICIPANTS:</b>
+<b>{mentions_text}</b>
+
+✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨
+
+🎯 <b>NOW SELECT YOUR ROLE:</b>
+<blockquote>
+Choose your role carefully to start the secure escrow trade!
+</blockquote>
+
+🔒 <b>SECURE • TRANSPARENT • TRUSTED</b>
+"""
+            
+            await client.send_message(
                 chat,
-                f"👥 <b>Both Seller and Buyer Joined!</b>\n\n"
-                f"<blockquote>Welcome, {mentions_text}\n"
-                f"Happy Trade! Please select your roles:</blockquote>",
+                welcome_text,
                 parse_mode='html',
                 buttons=buttons
             )
             
-            print(f"📝 Sent role selection for group: {chat.title}")
+            print(f"📝 Sent BIG role selection for group: {chat.title}")
             
         except Exception as e:
             print(f"Error sending role selection: {e}")
     
-    async def send_trade_started(self, chat, group_id, user_roles):
+    async def send_trade_started(self, client, chat, group_id, user_roles):
         """Send trade started message when both roles selected"""
         try:
             # Get buyer and seller info
@@ -329,32 +370,61 @@ class EscrowBot:
                 elif data["role"] == "seller":
                     sellers.append(data["name"])
             
-            buyers_text = ", ".join(buyers) if buyers else "Not selected"
-            sellers_text = ", ".join(sellers) if sellers else "Not selected"
+            buyers_text = " 🫂 ".join(buyers) if buyers else "Not selected"
+            sellers_text = " 🫂 ".join(sellers) if sellers else "Not selected"
             
-            await self.client.send_message(
+            trade_text = f"""
+🎉🎉🎉 <b>TRADE OFFICIALLY STARTED!</b> 🎉🎉🎉
+
+<blockquote>
+✅ <b>ROLES CONFIRMED & LOCKED!</b> ✅
+</blockquote>
+
+════════════════════════════════════
+
+🛒 <b>BUYER(S):</b> {buyers_text}
+
+════════════════════════════════════
+
+💰 <b>SELLER(S):</b> {sellers_text}
+
+════════════════════════════════════
+
+🔒 <b>ESCROW IS NOW ACTIVE!</b>
+<blockquote>
+• Funds are secured
+• Trade is monitored
+• Safe transaction guaranteed
+</blockquote>
+
+⚠️ <b>NEXT STEPS:</b>
+1. Discuss trade details
+2. Confirm terms
+3. Proceed with transaction
+4. Escrow protects both parties
+
+🚀 <b>HAPPY TRADING!</b> 🚀
+"""
+            
+            await client.send_message(
                 chat,
-                f"🎉 <b>TRADE STARTED!</b>\n\n"
-                f"<blockquote>Roles have been confirmed</blockquote>\n\n"
-                f"• <b>Buyer(s)</b>: {buyers_text}\n"
-                f"• <b>Seller(s)</b>: {sellers_text}\n\n"
-                f"🔒 Escrow is now active. Please proceed with the trade.",
+                trade_text,
                 parse_mode='html'
             )
             
-            print(f"✅ Trade started in group: {chat.title}")
+            print(f"✅ Trade officially started in group: {chat.title}")
             
         except Exception as e:
             print(f"Error sending trade started: {e}")
     
-    async def delete_invite_link(self, chat):
+    async def delete_invite_link(self, client, chat):
         """Delete invite link when 2 users join"""
         try:
             print(f"🔒 Deleting invite link for group: {chat.title}")
             
-            # Method 1: Simply disable inviting for everyone (simplest)
+            # Disable inviting for everyone
             try:
-                await self.client(functions.messages.EditChatDefaultBannedRightsRequest(
+                await client(functions.messages.EditChatDefaultBannedRightsRequest(
                     peer=chat,
                     banned_rights=types.ChatBannedRights(
                         until_date=0,
@@ -362,29 +432,16 @@ class EscrowBot:
                     )
                 ))
                 print(f"✅ Invite permissions disabled for {chat.title}")
+                
+                # Send brief security update
+                await client.send_message(
+                    chat,
+                    "🔒 <b>SECURITY:</b> Invite system locked.",
+                    parse_mode='html'
+                )
+                
             except Exception as e:
                 print(f"⚠️ Could not disable invites: {e}")
-            
-            # Method 2: Try to export and delete if possible
-            try:
-                # Try to create a new link just to get it, then delete it
-                # This might not work for bots, but we try
-                invite = await self.client(functions.messages.ExportChatInviteRequest(
-                    peer=chat
-                ))
-                
-                if hasattr(invite, 'link'):
-                    # Try to delete it (might not work for bots)
-                    try:
-                        await self.client(functions.messages.DeleteExportedChatInviteRequest(
-                            peer=chat,
-                            link=invite.link
-                        ))
-                        print(f"🗑️ Deleted invite link: {invite.link}")
-                    except:
-                        print(f"⚠️ Could not delete link (bot restriction)")
-            except Exception as e:
-                print(f"ℹ️ Could not manage link directly: {e}")
             
             print(f"✅ Invite system secured for {chat.title}")
             
@@ -420,9 +477,9 @@ class EscrowBot:
             print("   ❓ Help - Help and support")
             print("\n⚡ Advanced Features:")
             print("   • Auto group creation")
-            print("   • Role selection system")
+            print("   • BIG role selection interface")
             print("   • Auto invite link deletion")
-            print("   • Trade confirmation")
+            print("   • Official trade start confirmation")
             print("\n⚡ Bot is listening for messages...")
             print("   Press Ctrl+C to stop")
             
