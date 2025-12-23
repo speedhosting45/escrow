@@ -142,7 +142,7 @@ async def create_p2p_group(user_id, bot_client):
             print(f"⚠️ Could not add bot: {e}")
             # Continue anyway
         
-        # Promote bot as admin
+        # Promote bot as admin - FIXED: removed duplicate add_admins parameter
         try:
             # Get the bot's participant entity in the group
             participants = await user_client.get_participants(group)
@@ -153,20 +153,18 @@ async def create_p2p_group(user_id, bot_client):
                     break
             
             if bot_participant:
-                # Set bot as admin
+                # Set bot as admin - CORRECTED VERSION
                 await user_client.edit_admin(
                     group,
                     bot_participant,
                     is_admin=True,
-                    add_admins=False,
                     change_info=True,
                     post_messages=True,
                     edit_messages=True,
                     delete_messages=True,
                     ban_users=True,
                     invite_users=True,
-                    pin_messages=True,
-                    add_admins=False
+                    pin_messages=True
                 )
                 print(f"✅ Bot promoted as admin")
         except Exception as e:
