@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Escrow Bot - Fixed tracking
+Main entry point for the Escrow Bot - Fixed member tracking
 """
 import asyncio
 import logging
@@ -124,117 +124,56 @@ class EscrowBot:
         async def begin_handler(event):
             await self.handle_begin_command(event)
         
-        # Delete Telegram system messages (group created, user added messages)
+        # Delete Telegram system messages AND track user joins
         @self.client.on(events.NewMessage)
-        async def delete_system_messages(event):
-            """Delete Telegram system messages automatically"""
+        async def handle_all_messages(event):
+            """Handle all messages: delete system messages and track user joins"""
             try:
-                # Check if message is from Telegram (system message)
-                if event.sender_id == 777000 or event.sender_id == 1087968824:  # Telegram IDs
-                    print(f"🗑️ Deleting system message: {event.text[:50]}...")
-                    await event.delete()
-                    return
-                
-                # Also delete common system message patterns
                 message_text = event.text or ""
+                chat = await event.get_chat()
+                chat_id = str(chat.id)
+                
+                # Clean chat ID for lookup
+                if chat_id.startswith('-100'):
+                    clean_chat_id = chat_id[4:]
+                else:
+                    clean_chat_id = chat_id
+                
+                # 1. DELETE SYSTEM MESSAGES
                 system_patterns = [
                     "created the group",
                     "added ",
-                    "joined the group",
+                    "joined the group via invite link",
                     "left the group",
                     "was added",
                     "pinned a message"
                 ]
                 
-                if any(pattern in message_text for pattern in system_patterns):
-                    print(f"🗑️ Deleting system-like message: {message_text[:50]}...")
+                is_system_message = False
+                # Check if from Telegram or contains system patterns
+                if event.sender_id == 777000 or event.sender_id == 1087968824:
+                    is_system_message = True
+                elif any(pattern in message_text.lower() for pattern in system_patterns):
+                    is_system_message = True
+                
+                if is_system_message:
+                    print(f"🗑️ Deleting system message: {message_text[:50]}...")
                     await event.delete()
+                    
+                    # 2. TRACK USER JOINS FROM SYSTEM MESSAGES
+                    # Parse user join from system message
+                    if "joined the group via invite link" in message_text or "was added" in message_text:
+                        await self.track_user_join_from_message(message_text, chat, clean_chat_id)
+                    
                     return
-                    
+                
+                # 3. Handle /begin command directly (already handled, but as fallback)
+                if message_text == '/begin':
+                    await self.handle_begin_command(event)
+                
             except Exception as e:
-                # Silently ignore errors when deleting messages
+                # Silently ignore errors
                 pass
-        
-        # Chat Action Handler for join notifications
-        @self.client.on(events.ChatAction())
-        async def chat_action_handler(event):
-            """
-            Handle user joins to groups where bot is admin
-            """
-            try:
-                # Check if it's a user join event
-                if event.user_joined or event.user_added:
-                    # Get the user who joined
-                    user_id = event.user_id
-                    if not user_id:
-                        return
-                    
-                    chat = await event.get_chat()
-                    chat_id = str(chat.id)
-                    
-                    # Convert to string for negative IDs (groups)
-                    if chat_id.startswith('-100'):
-                        # For supergroups, store without -100 prefix for consistency
-                        clean_chat_id = chat_id[4:]
-                    else:
-                        clean_chat_id = chat_id
-                    
-                    # Skip if bot
-                    try:
-                        user_obj = await event.client.get_entity(user_id)
-                        if user_obj.bot:
-                            return
-                    except:
-                        pass
-                    
-                    # Load groups data
-                    groups = load_groups()
-                    
-                    # Try to find group by both ID formats
-                    group_data = None
-                    group_key = None
-                    
-                    # Try exact match first
-                    if clean_chat_id in groups:
-                        group_data = groups[clean_chat_id]
-                        group_key = clean_chat_id
-                    elif chat_id in groups:
-                        group_data = groups[chat_id]
-                        group_key = chat_id
-                    else:
-                        # Try to find by group name
-                        for key, data in groups.items():
-                            if data.get("name") == chat.title:
-                                group_data = data
-                                group_key = key
-                                break
-                    
-                    if not group_data:
-                        print(f"❌ Group {clean_chat_id} ({chat.title}) not found in groups data")
-                        return
-                    
-                    # Initialize members list if not exists
-                    if "members" not in group_data:
-                        group_data["members"] = []
-                    
-                    # Add user if not already in list
-                    if user_id not in group_data["members"]:
-                        group_data["members"].append(user_id)
-                        
-                        # Update group data
-                        groups[group_key] = group_data
-                        save_groups(groups)
-                        
-                        # Check member count
-                        member_count = len(group_data["members"])
-                        print(f"👤 User {user_id} joined group: {chat.title} (Total: {member_count})")
-                        
-                        # When 2 users join, delete invite link
-                        if member_count >= 2:
-                            await self.delete_invite_link(event.client, chat)
-                    
-            except Exception as e:
-                print(f"Error in chat action handler: {e}")
         
         # Handle role selection buttons
         @self.client.on(events.CallbackQuery(pattern=rb'role_'))
@@ -273,11 +212,11 @@ class EscrowBot:
                 
                 # Check if group_id matches (try both formats)
                 if group_id != clean_chat_id and group_id != chat_id:
-                    # Try to find group by name or other identifier
+                    # Try to find group by name
                     groups = load_groups()
                     found = False
                     for key, data in groups.items():
-                        if key == group_id or data.get("name") == chat.title:
+                        if data.get("name") == chat.title:
                             group_id = key
                             found = True
                             break
@@ -357,8 +296,75 @@ Role cannot be changed.
                 print(f"Error in role handler: {e}")
                 await event.answer("❌ Error selecting role", alert=True)
     
+    async def track_user_join_from_message(self, message_text, chat, clean_chat_id):
+        """Track user join from system message"""
+        try:
+            # Load groups data
+            groups = load_groups()
+            
+            # Find group data
+            group_data = None
+            group_key = None
+            
+            # Try exact match first
+            if clean_chat_id in groups:
+                group_data = groups[clean_chat_id]
+                group_key = clean_chat_id
+            else:
+                # Try to find by group name
+                for key, data in groups.items():
+                    if data.get("name") == chat.title:
+                        group_data = data
+                        group_key = key
+                        break
+            
+            if not group_data:
+                return
+            
+            # Parse user ID from message (this is simplified)
+            # In real implementation, you'd need to extract user info from message
+            # For now, we'll get actual participants count
+            
+            # Get actual participants from Telegram
+            try:
+                participants = await self.client.get_participants(chat)
+                
+                # Count real users (not bots, not creator)
+                real_users = []
+                for participant in participants:
+                    # Skip bots
+                    if participant.bot:
+                        continue
+                    
+                    # Skip creator if known
+                    if group_data.get("creator_id") and participant.id == group_data["creator_id"]:
+                        continue
+                    
+                    real_users.append(participant.id)
+                
+                # Update members list
+                group_data["members"] = list(set(real_users))  # Remove duplicates
+                
+                # Save updated data
+                groups[group_key] = group_data
+                save_groups(groups)
+                
+                member_count = len(group_data["members"])
+                print(f"📊 Updated member count for {chat.title}: {member_count} real users")
+                
+                # When 2 users join, delete invite link
+                if member_count >= 2:
+                    await self.delete_invite_link(self.client, chat)
+                    print(f"✅ Auto-deleted invite link for {chat.title} (2+ users)")
+                
+            except Exception as e:
+                print(f"Error getting participants: {e}")
+                
+        except Exception as e:
+            print(f"Error tracking user join: {e}")
+    
     async def handle_begin_command(self, event):
-        """Handle /begin command to start escrow session"""
+        """Handle /begin command to start escrow session - FIXED VERSION"""
         try:
             chat = await event.get_chat()
             user = await event.get_sender()
@@ -393,7 +399,7 @@ Role cannot be changed.
             
             if not group_data:
                 print(f"❌ Group {clean_chat_id} ({chat.title}) not found in groups data")
-                await event.reply("❌ Group not found in system.")
+                await event.reply("❌ Group not found in system. Wait a moment and try again.")
                 return
             
             # Check if session already initiated
@@ -401,31 +407,51 @@ Role cannot be changed.
                 await event.reply("⚠️ Escrow session has already been initiated.")
                 return
             
-            # Check if we have 2 members
-            members = group_data.get("members", [])
-            if len(members) < 2:
-                await event.reply("⏳ Waiting for both participants to join...")
-                return
-            
-            # Get bot username
-            bot_username = group_data.get("bot_username", BOT_USERNAME)
-            if not bot_username:
-                me = await self.client.get_me()
-                bot_username = me.username
-            
-            # Get the two users
-            user1_id = members[0]
-            user2_id = members[1]
-            
+            # FIXED: Get ACTUAL participant count from Telegram API
             try:
-                user1 = await self.client.get_entity(user1_id)
-                user2 = await self.client.get_entity(user2_id)
+                participants = await self.client.get_participants(chat)
                 
-                user1_display = get_user_display(user1)
-                user2_display = get_user_display(user2)
+                # Count real users (not bots, not creator)
+                real_users = []
+                for participant in participants:
+                    # Skip bots
+                    if participant.bot:
+                        continue
+                    
+                    # Skip creator if known
+                    if group_data.get("creator_id") and participant.id == group_data["creator_id"]:
+                        continue
+                    
+                    real_users.append(participant.id)
                 
-                # Format display
-                display_text = f"{user1_display} • {user2_display}"
+                member_count = len(real_users)
+                print(f"🔍 Actual member count for {chat.title}: {member_count} real users")
+                
+                if member_count < 2:
+                    await event.reply(f"⏳ Waiting for both participants to join... (Current: {member_count}/2)")
+                    return
+                
+                # Update stored members list with actual data
+                group_data["members"] = real_users
+                groups[group_key] = group_data
+                save_groups(groups)
+                
+                # Get bot username
+                bot_username = group_data.get("bot_username", BOT_USERNAME)
+                if not bot_username:
+                    me = await self.client.get_me()
+                    bot_username = me.username
+                
+                # Get user displays
+                user_displays = []
+                for user_id in real_users[:2]:  # First 2 users
+                    try:
+                        user_obj = await self.client.get_entity(user_id)
+                        user_displays.append(get_user_display(user_obj))
+                    except:
+                        user_displays.append(f"User_{user_id}")
+                
+                display_text = " • ".join(user_displays)
                 
                 # Format session initiation message
                 message = f"""
@@ -470,11 +496,12 @@ Role selection is final.
                 print(f"🚀 Escrow session initiated by {get_user_display(user)} in group: {chat.title}")
                 
             except Exception as e:
-                print(f"Error getting user entities: {e}")
-                await event.reply("❌ Error starting escrow session.")
+                print(f"Error getting participants: {e}")
+                await event.reply("❌ Error checking participants. Please try again.")
                 
         except Exception as e:
             print(f"Error handling /begin command: {e}")
+            await event.reply("❌ Error processing command.")
     
     async def send_roles_confirmed(self, client, chat, group_id, user_roles):
         """Send roles confirmed message"""
@@ -529,7 +556,7 @@ Wallet setup will be handled in next phase.
                         invite_users=True
                     )
                 ))
-                print(f"✅ Invite permissions disabled")
+                print(f"✅ Invite permissions disabled for {chat.title}")
             except Exception as e:
                 print(f"⚠️ Could not disable invites: {e}")
             
@@ -561,13 +588,12 @@ Wallet setup will be handled in next phase.
             print("   /start - Start the bot")
             print("   /begin - Initiate escrow session (in groups)")
             print("\n⚡ Features:")
-            print("   • Auto-delete Telegram system messages")
-            print("   • Creator anonymous admin")
-            print("   • Clean group creation")
-            print("   • Working /begin command")
+            print("   • Auto-delete system messages")
+            print("   • REAL-TIME member tracking")
+            print("   • Working /begin with actual participant count")
             print("   • Role selection system")
-            print("   • No auto-response to messages")
-            print("\n⚡ Bot is listening for commands only...")
+            print("   • Auto invite link deletion")
+            print("\n⚡ Bot is listening for commands...")
             print("   Press Ctrl+C to stop")
             
             # Run until disconnected
