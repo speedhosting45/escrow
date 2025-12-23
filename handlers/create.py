@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create escrow handlers - Clean version (no user addition)
+Create escrow handlers - Updated with hidden history and custom bio
 """
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
@@ -104,6 +104,8 @@ async def handle_create_p2p(event):
             print(f"🤖 Bot Added: @{bot_username}")
             print(f"👑 Creator Promoted: YES (Anonymous Admin)")
             print(f"📌 Welcome Message Pinned: YES")
+            print(f"👻 History Hidden: YES (New users won't see old messages)")
+            print(f"📝 Custom Bio Set: YES")
             print("="*60 + "\n")
             
         else:
@@ -174,6 +176,8 @@ async def handle_create_other(event):
             print(f"🤖 Bot Added: @{bot_username}")
             print(f"👑 Creator Promoted: YES (Anonymous Admin)")
             print(f"📌 Welcome Message Pinned: YES")
+            print(f"👻 History Hidden: YES (New users won't see old messages)")
+            print(f"📝 Custom Bio Set: YES")
             print("="*60 + "\n")
             
         else:
@@ -193,7 +197,7 @@ async def handle_create_other(event):
 
 async def create_escrow_group(group_name, bot_username, group_type, bot_client):
     """
-    Create a supergroup, add bot ONLY, promote creator as anonymous admin, and pin welcome message
+    Create a supergroup with hidden history and custom bio
     """
     if not STRING_SESSION1:
         print("❌ STRING_SESSION1 not configured in .env")
@@ -219,7 +223,7 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
         # Create supergroup - EMPTY (no users added)
         created = await user_client(functions.channels.CreateChannelRequest(
             title=group_name,
-            about=f"Secure {group_type.upper()} Escrow Group",
+            about=f"Secure {group_type.upper()} Escrow Group",  # Temporary about
             megagroup=True,
             broadcast=False
         ))
@@ -229,6 +233,32 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
         chat_id = chat.id
         channel = types.InputPeerChannel(channel_id=chat.id, access_hash=chat.access_hash)
         print(f"✅ Supergroup created: {chat_id}")
+        
+        # 🔥 CRITICAL: HIDE PRE-HISTORY (New users won't see old system messages)
+        print("🔄 Hiding pre-history for new users...")
+        try:
+            await user_client(functions.channels.TogglePreHistoryHiddenRequest(
+                channel=channel,
+                enabled=True  # True = Hide history for new users
+            ))
+            print(f"✅ History hidden for new users (Clean premium look)")
+        except Exception as e:
+            print(f"⚠️ Could not hide history: {e}")
+        
+        # 🔥 SET CUSTOM GROUP BIO (About text)
+        print("🔄 Setting custom group bio...")
+        try:
+            await user_client(functions.channels.EditAboutRequest(
+                channel=channel,
+                about=(
+                    f"🔐 This group is being escrowed by @{bot_username}\n\n"
+                    f"🧑‍💼 Seller : \n"
+                    f"🧑‍💼 Buyer  :"
+                )
+            ))
+            print(f"✅ Custom bio set with bot mention")
+        except Exception as e:
+            print(f"⚠️ Could not set custom bio: {e}")
         
         # CRITICAL: Promote creator as ANONYMOUS admin
         print("🔄 Promoting creator as ANONYMOUS admin...")
@@ -354,8 +384,6 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
             await user_client.disconnect()
             print(f"✅ User client disconnected")
 
-# In the store_group_data function, update to store clean IDs:
-
 def store_group_data(group_id, group_name, group_type, creator_id, bot_username):
     """Store group data for tracking"""
     try:
@@ -379,6 +407,8 @@ def store_group_data(group_id, group_name, group_type, creator_id, bot_username)
             "original_id": str(group_id),  # Store original for reference
             "members": [],  # Start empty, will be filled when users join
             "welcome_pinned": True,
+            "history_hidden": True,  # Track that history is hidden
+            "custom_bio_set": True,  # Track custom bio
             "session_initiated": False,  # Track if /begin has been used
             "created_at": asyncio.get_event_loop().time()
         }
