@@ -4,7 +4,9 @@ Main entry point for the Escrow Bot
 """
 import asyncio
 import logging
+import sys
 from telethon import TelegramClient, events
+from telethon.errors import MessageNotModifiedError
 
 # Import configuration
 from config import API_ID, API_HASH, BOT_TOKEN
@@ -71,23 +73,38 @@ class EscrowBot:
                     buttons=get_main_menu_buttons(),
                     parse_mode='html'
                 )
+            except MessageNotModifiedError:
+                # Message already has this content
+                await event.answer("✅ Main menu", alert=False)
             except Exception as e:
                 logger.error(f"Error in back handler: {e}")
-                await event.answer("❌ An error occurred.", alert=True)
+                try:
+                    await event.answer("❌ An error occurred.", alert=True)
+                except:
+                    pass
         
         @self.client.on(events.NewMessage)
         async def message_handler(event):
             """Handle other messages"""
             if event.text and not event.text.startswith('/'):
-                await event.respond(
-                    "Please use the buttons below to navigate:",
-                    buttons=get_main_menu_buttons()
-                )
+                try:
+                    await event.respond(
+                        "Please use the buttons below to navigate:",
+                        buttons=get_main_menu_buttons()
+                    )
+                except Exception as e:
+                    logger.error(f"Error in message handler: {e}")
     
     async def run(self):
         """Run the bot"""
         try:
             print("🔐 Secure Escrow Bot Starting...")
+            
+            # Check config
+            if not API_ID or not API_HASH or not BOT_TOKEN:
+                print("❌ Missing configuration in .env file")
+                print("Please set API_ID, API_HASH, and BOT_TOKEN")
+                sys.exit(1)
             
             # Start the client
             await self.client.start(bot_token=BOT_TOKEN)
@@ -116,6 +133,8 @@ class EscrowBot:
         except Exception as e:
             logger.error(f"Error running bot: {e}")
             print(f"\n❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
         finally:
             print("\n🔴 Bot shutdown complete")
 
@@ -132,6 +151,10 @@ def main():
             print("\n👋 Bot stopped")
         else:
             print(f"\n❌ Unexpected error: {e}")
+            import traceback
+            traceback.print_exc()
+    except KeyboardInterrupt:
+        print("\n👋 Bot stopped by user")
 
 if __name__ == '__main__':
     main()
