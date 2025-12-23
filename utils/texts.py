@@ -11,7 +11,23 @@ Welcome! This bot helps you create secure escrow deals between buyers and seller
 
 Choose an option below to continue ⬇️
 """
+# Add this to your texts.py file
 
+OTHER_CREATED_MESSAGE = """
+<b>📦 Other Deal Escrow Created</b>
+
+<blockquote>
+Your private escrow group has been created successfully
+</blockquote>
+
+• Group Name: <b>{GROUP_NAME}</b>  
+• Type: <b>Other Deal</b>  
+
+Please continue your deal inside the group.
+
+🔗 <b>Group Link:</b>  
+<a href="{GROUP_INVITE_LINK}">{GROUP_INVITE_LINK}</a>
+"""
 CREATE_MESSAGE = """
 <b>➕ Create Escrow</b>
 
