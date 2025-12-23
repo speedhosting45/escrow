@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Create escrow handlers - Updated version
+Create escrow handlers - Updated with anonymous admin
 """
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
 from telethon import Button
 from telethon.tl.types import ChatAdminRights
-from config import STRING_SESSION1, API_ID, API_HASH
+from config import STRING_SESSION1, API_ID, API_HASH, set_bot_username
 from telethon import TelegramClient
 import asyncio
 import json
@@ -65,13 +65,14 @@ async def handle_create_p2p(event):
         # Get bot info
         bot = await event.client.get_me()
         bot_username = bot.username
+        set_bot_username(bot_username)  # Set globally
         
         # Get group number
         group_number = get_next_number("p2p")
-        group_name = f"ESCROW P2P BY @{bot_username} #{group_number:02d}"
+        group_name = f"P2P Escrow #{group_number:02d}"
         
         # Create group
-        result = await create_escrow_group(group_name, bot_username, "p2p")
+        result = await create_escrow_group(group_name, bot_username, "p2p", event.client)
         
         if result and "invite_url" in result:
             from utils.texts import P2P_CREATED_MESSAGE
@@ -101,12 +102,10 @@ async def handle_create_p2p(event):
             print(f"🔗 Initial Invite: {result['invite_url']}")
             print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
             print(f"🤖 Bot Added: @{bot_username}")
-            print(f"👑 Creator Promoted: YES")
+            print(f"👑 Creator Promoted: YES (Anonymous Admin)")
+            print(f"📌 Welcome Message Pinned: YES")
             print(f"⚠️ Invite auto-delete: AFTER 2 USERS JOIN")
             print("="*60 + "\n")
-            
-            # Store group data for tracking
-            store_group_data(result["group_id"], group_name, "p2p", result.get("creator_id"))
             
         else:
             await event.edit(
@@ -137,13 +136,14 @@ async def handle_create_other(event):
         # Get bot info
         bot = await event.client.get_me()
         bot_username = bot.username
+        set_bot_username(bot_username)  # Set globally
         
         # Get group number
         group_number = get_next_number("other")
-        group_name = f"OTHER DEAL #{group_number:02d}"
+        group_name = f"Other Deal #{group_number:02d}"
         
         # Create group
-        result = await create_escrow_group(group_name, bot_username, "other")
+        result = await create_escrow_group(group_name, bot_username, "other", event.client)
         
         if result and "invite_url" in result:
             from utils.texts import OTHER_CREATED_MESSAGE
@@ -173,12 +173,10 @@ async def handle_create_other(event):
             print(f"🔗 Initial Invite: {result['invite_url']}")
             print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
             print(f"🤖 Bot Added: @{bot_username}")
-            print(f"👑 Creator Promoted: YES")
+            print(f"👑 Creator Promoted: YES (Anonymous Admin)")
+            print(f"📌 Welcome Message Pinned: YES")
             print(f"⚠️ Invite auto-delete: AFTER 2 USERS JOIN")
             print("="*60 + "\n")
-            
-            # Store group data for tracking
-            store_group_data(result["group_id"], group_name, "other", result.get("creator_id"))
             
         else:
             await event.edit(
@@ -195,9 +193,9 @@ async def handle_create_other(event):
             buttons=[Button.inline("🔄 Try Again", b"create")]
         )
 
-async def create_escrow_group(group_name, bot_username, group_type):
+async def create_escrow_group(group_name, bot_username, group_type, bot_client):
     """
-    Create a supergroup, add bot, and promote creator
+    Create a supergroup, add bot, promote creator as anonymous admin, and pin welcome message
     """
     if not STRING_SESSION1:
         print("❌ STRING_SESSION1 not configured in .env")
@@ -234,6 +232,54 @@ async def create_escrow_group(group_name, bot_username, group_type):
         channel = types.InputPeerChannel(channel_id=chat.id, access_hash=chat.access_hash)
         print(f"✅ Supergroup created: {chat_id}")
         
+        # CRITICAL: Promote creator as ANONYMOUS admin
+        print("🔄 Promoting creator as ANONYMOUS admin...")
+        try:
+            await user_client(functions.channels.EditAdminRequest(
+                channel=channel,
+                user_id=creator,
+                admin_rights=ChatAdminRights(
+                    change_info=True,
+                    post_messages=True,
+                    edit_messages=True,
+                    delete_messages=True,
+                    ban_users=True,
+                    invite_users=True,
+                    pin_messages=True,
+                    add_admins=True,
+                    anonymous=True,  # ANONYMOUS - MOST IMPORTANT
+                    manage_call=True,
+                    other=True
+                ),
+                rank="Owner"
+            ))
+            print(f"✅ Creator promoted as ANONYMOUS admin (hidden)")
+        except Exception as e:
+            print(f"⚠️ Could not promote creator as anonymous: {e}")
+            # Try without anonymous flag
+            try:
+                await user_client(functions.channels.EditAdminRequest(
+                    channel=channel,
+                    user_id=creator,
+                    admin_rights=ChatAdminRights(
+                        change_info=True,
+                        post_messages=True,
+                        edit_messages=True,
+                        delete_messages=True,
+                        ban_users=True,
+                        invite_users=True,
+                        pin_messages=True,
+                        add_admins=True,
+                        anonymous=False,
+                        manage_call=True,
+                        other=True
+                    ),
+                    rank="Owner"
+                ))
+                print(f"✅ Creator promoted as regular admin")
+            except Exception as e2:
+                print(f"❌ Could not promote creator at all: {e2}")
+        
         # Add bot to group
         print("🔄 Adding bot to group...")
         await user_client(functions.channels.InviteToChannelRequest(
@@ -242,7 +288,7 @@ async def create_escrow_group(group_name, bot_username, group_type):
         ))
         print(f"✅ Bot added to group")
         
-        # Promote bot as admin
+        # Promote bot as admin (not anonymous)
         print("🔄 Promoting bot as admin...")
         await user_client(functions.channels.EditAdminRequest(
             channel=channel,
@@ -272,12 +318,31 @@ async def create_escrow_group(group_name, bot_username, group_type):
         invite_url = str(invite_link.link)
         print(f"✅ Initial invite link created")
         
+        # Send and PIN welcome message
+        print("🔄 Sending and pinning welcome message...")
+        from utils.texts import WELCOME_MESSAGE
+        
+        welcome_msg = WELCOME_MESSAGE.format(bot_username=bot_username)
+        sent_message = await user_client.send_message(
+            channel,
+            welcome_msg,
+            parse_mode='html'
+        )
+        
+        # Pin the welcome message
+        await user_client.pin_message(channel, sent_message, notify=False)
+        print(f"✅ Welcome message pinned")
+        
+        # Store group data for tracking
+        store_group_data(chat_id, group_name, group_type, creator.id, bot_username)
+        
         # Return result
         return {
             "group_id": chat_id,
             "invite_url": invite_url,
             "group_name": group_name,
-            "creator_id": creator.id
+            "creator_id": creator.id,
+            "bot_username": bot_username
         }
         
     except Exception as e:
@@ -291,8 +356,8 @@ async def create_escrow_group(group_name, bot_username, group_type):
             await user_client.disconnect()
             print(f"✅ User client disconnected")
 
-def store_group_data(group_id, group_name, group_type, creator_id=None):
-    """Store group data for tracking joins"""
+def store_group_data(group_id, group_name, group_type, creator_id, bot_username):
+    """Store group data for tracking"""
     try:
         GROUPS_FILE = 'data/active_groups.json'
         groups = {}
@@ -305,7 +370,9 @@ def store_group_data(group_id, group_name, group_type, creator_id=None):
             "name": group_name,
             "type": group_type,
             "creator_id": creator_id,
+            "bot_username": bot_username,
             "members": [],
+            "welcome_pinned": True,
             "created_at": asyncio.get_event_loop().time()
         }
         
