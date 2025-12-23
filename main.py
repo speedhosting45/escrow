@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Escrow Bot
+Main entry point for the Escrow Bot - Updated
 """
 import asyncio
 import logging
@@ -40,7 +40,6 @@ logger = logging.getLogger(__name__)
 # Track groups for invite management
 GROUPS_FILE = 'data/active_groups.json'
 USER_ROLES_FILE = 'data/user_roles.json'
-WALLETS_FILE = 'data/wallets.json'
 BEGIN_TRACK_FILE = 'data/begin_track.json'
 
 def load_groups():
@@ -67,18 +66,6 @@ def save_user_roles(roles):
     with open(USER_ROLES_FILE, 'w') as f:
         json.dump(roles, f, indent=2)
 
-def load_wallets():
-    """Load wallet addresses"""
-    if os.path.exists(WALLETS_FILE):
-        with open(WALLETS_FILE, 'r') as f:
-            return json.load(f)
-    return {}
-
-def save_wallets(wallets):
-    """Save wallet addresses"""
-    with open(WALLETS_FILE, 'w') as f:
-        json.dump(wallets, f, indent=2)
-
 def load_begin_track():
     """Load /begin tracking"""
     if os.path.exists(BEGIN_TRACK_FILE):
@@ -96,11 +83,20 @@ def get_user_display(user_obj):
     if user_obj.username:
         return f"@{user_obj.username}"
     else:
-        return user_obj.first_name or f"User_{user_obj.id}"
+        # Clean special characters but keep basic text
+        name = user_obj.first_name or f"User_{user_obj.id}"
+        # Remove problematic formatting characters
+        import re
+        name = re.sub(r'[^\w\s@#]', '', name)
+        return name.strip() or f"User_{user_obj.id}"
 
 def get_user_link(user_obj):
-    """Get user link for mentions"""
+    """Get user link for mentions - cleaned"""
     name = user_obj.first_name or f"User_{user_obj.id}"
+    # Clean the name
+    import re
+    name = re.sub(r'[^\w\s]', '', name)
+    name = name.strip() or f"User_{user_obj.id}"
     return f'<a href="tg://user?id={user_obj.id}">{name}</a>'
 
 class EscrowBot:
@@ -151,33 +147,8 @@ class EscrowBot:
                 logger.error(f"Error in back handler: {e}")
                 await event.answer("❌ An error occurred.", alert=True)
         
-        @self.client.on(events.NewMessage)
-        async def message_handler(event):
-            """Handle all messages"""
-            try:
-                text = event.text
-                
-                # Handle /begin command
-                if text == '/begin':
-                    await self.handle_begin_command(event)
-                
-                # Handle /buyer command
-                elif text and text.startswith('/buyer '):
-                    await self.handle_buyer_wallet(event)
-                
-                # Handle /seller command
-                elif text and text.startswith('/seller '):
-                    await self.handle_seller_wallet(event)
-                
-                # Handle other non-command messages
-                elif text and not text.startswith('/'):
-                    await event.respond(
-                        "Please use the buttons below to navigate:",
-                        buttons=get_main_menu_buttons()
-                    )
-                    
-            except Exception as e:
-                logger.error(f"Error in message handler: {e}")
+        # REMOVED: Auto-response to messages
+        # Bot will only respond to commands and button clicks
         
         # Chat Action Handler for join notifications
         @self.client.on(events.ChatAction())
@@ -254,12 +225,12 @@ class EscrowBot:
                 if data.startswith('role_buyer_'):
                     role = "buyer"
                     role_name = "Buyer"
-                    success_alert = "🔐 Buyer Role Selected (Success)\nBuyer role confirmed.\n\nThis role is now locked for this escrow session."
+                    success_alert = "🔐 Buyer Role Selected\nBuyer role confirmed."
                     group_id = data.replace('role_buyer_', '')
                 elif data.startswith('role_seller_'):
                     role = "seller"
                     role_name = "Seller"
-                    success_alert = "🔐 Seller Role Selected (Success)\nSeller role confirmed.\n\nThis role is now locked for this escrow session."
+                    success_alert = "🔐 Seller Role Selected\nSeller role confirmed."
                     group_id = data.replace('role_seller_', '')
                 else:
                     return
@@ -276,7 +247,7 @@ class EscrowBot:
                 # Check if user already selected a role
                 if str(sender.id) in roles[group_id]:
                     await event.answer(
-                        "⛔ Role Already Chosen (Blocked)\nAction denied.\n\nYour role has already been declared and cannot be changed.",
+                        "⛔ Role Already Chosen\nYour role has already been declared.",
                         alert=True
                     )
                     return
@@ -285,7 +256,7 @@ class EscrowBot:
                 role_taken = any(u["role"] == role for u in roles[group_id].values())
                 if role_taken:
                     await event.answer(
-                        "⚠️ Role Already Taken\nThis role has already been assigned.\n\nPlease select the remaining available role.",
+                        "⚠️ Role Already Taken\nPlease select the remaining role.",
                         alert=True
                     )
                     return
@@ -374,17 +345,36 @@ class EscrowBot:
                 user1 = await self.client.get_entity(user1_id)
                 user2 = await self.client.get_entity(user2_id)
                 
-                user1_name = get_user_display(user1)
-                user2_name = get_user_display(user2)
+                user1_display = get_user_display(user1)
+                user2_display = get_user_display(user2)
+                
+                # Format display names for message
+                display_text = ""
+                if user1.username or user2.username:
+                    # Show usernames if available
+                    display_text = f"{user1_display} • {user2_display}"
+                else:
+                    # Show clean names
+                    display_text = f"{user1_display} • {user2_display}"
                 
                 # Format session initiation message
-                message = SESSION_INITIATED_MESSAGE.format(
-                    bot_username=bot_username,
-                    user1_id=user1_id,
-                    user1_name=user1_name,
-                    user2_id=user2_id,
-                    user2_name=user2_name
-                )
+                message = f"""
+<b>🔐 @{bot_username} P2P Escrow Session Initiated</b>
+
+Participants: {display_text}
+
+This escrow session is governed by verified rules.
+
+<b>Please declare your role:</b>
+
+<code>
+Buyer  → Select Buyer role
+Seller → Select Seller role
+</code>
+
+<b>Important:</b>
+Role selection is final.
+"""
                 
                 # Create role selection buttons
                 buttons = [
@@ -410,11 +400,10 @@ class EscrowBot:
                 
             except Exception as e:
                 print(f"Error getting user entities: {e}")
-                await event.reply("❌ Error starting escrow session. Please try again.")
+                await event.reply("❌ Error starting escrow session.")
                 
         except Exception as e:
             print(f"Error handling /begin command: {e}")
-            await event.reply("❌ Error processing command.")
     
     async def send_wallet_setup(self, client, chat, group_id, user_roles):
         """Send wallet setup instructions after roles confirmed"""
@@ -432,11 +421,17 @@ class EscrowBot:
             if not buyer or not seller:
                 return
             
-            # Format message using template
-            message = WALLET_SETUP_MESSAGE.format(
-                buyer_name=buyer['name'],
-                seller_name=seller['name']
-            )
+            # Format message
+            message = f"""
+<b>✅ Roles Confirmed</b>
+
+<blockquote>
+<b>Buyer:</b> {buyer['name']}  
+<b>Seller:</b> {seller['name']}
+</blockquote>
+
+Wallet setup will be handled in next phase.
+"""
             
             await client.send_message(
                 chat,
@@ -444,210 +439,10 @@ class EscrowBot:
                 parse_mode='html'
             )
             
-            print(f"💰 Sent wallet setup for group: {chat.title}")
+            print(f"💰 Roles confirmed in group: {chat.title}")
             
         except Exception as e:
-            print(f"Error sending wallet setup: {e}")
-    
-    async def handle_buyer_wallet(self, event):
-        """Handle /buyer wallet address command"""
-        try:
-            chat = await event.get_chat()
-            user = await event.get_sender()
-            chat_id = str(chat.id)
-            
-            # Extract wallet address
-            parts = event.text.split(' ', 1)
-            if len(parts) < 2:
-                await event.reply("❌ Please provide a wallet address: `/buyer YOUR_WALLET_ADDRESS`")
-                return
-            
-            wallet_address = parts[1].strip()
-            
-            # Validate wallet address
-            if len(wallet_address) < 10:
-                await event.reply("❌ Wallet address seems too short. Please check and try again.")
-                return
-            
-            # Load roles and wallets
-            roles = load_user_roles()
-            wallets = load_wallets()
-            
-            # Check if user is buyer in this group
-            if chat_id not in roles or str(user.id) not in roles[chat_id]:
-                await event.reply("❌ You haven't selected a role in this group yet.")
-                return
-            
-            if roles[chat_id][str(user.id)]["role"] != "buyer":
-                await event.reply("❌ Only the buyer can set the buyer wallet address.")
-                return
-            
-            # Save wallet address
-            if chat_id not in wallets:
-                wallets[chat_id] = {}
-            
-            wallets[chat_id]["buyer"] = {
-                "address": wallet_address,
-                "set_by": user.id,
-                "set_at": time.time(),
-                "name": get_user_display(user)
-            }
-            
-            save_wallets(wallets)
-            
-            # Check if both wallets are set
-            both_set = False
-            if "buyer" in wallets.get(chat_id, {}) and "seller" in wallets.get(chat_id, {}):
-                both_set = True
-            
-            # Format wallet preview
-            if len(wallet_address) > 30:
-                wallet_preview = f"{wallet_address[:20]}...{wallet_address[-10:]}"
-            else:
-                wallet_preview = wallet_address
-            
-            # Send confirmation
-            status_message = '✅ Both wallets set! Ready for escrow.' if both_set else '⏳ Waiting for seller wallet...'
-            
-            await event.reply(
-                f"✅ Buyer wallet address saved!\n\n"
-                f"<code>{wallet_preview}</code>\n\n"
-                f"{status_message}",
-                parse_mode='html'
-            )
-            
-            # If both wallets are set, proceed to next step
-            if both_set:
-                await self.start_escrow(event.client, chat, chat_id)
-            
-        except Exception as e:
-            print(f"Error handling buyer wallet: {e}")
-            await event.reply("❌ Error saving wallet address. Please try again.")
-    
-    async def handle_seller_wallet(self, event):
-        """Handle /seller wallet address command"""
-        try:
-            chat = await event.get_chat()
-            user = await event.get_sender()
-            chat_id = str(chat.id)
-            
-            # Extract wallet address
-            parts = event.text.split(' ', 1)
-            if len(parts) < 2:
-                await event.reply("❌ Please provide a wallet address: `/seller YOUR_WALLET_ADDRESS`")
-                return
-            
-            wallet_address = parts[1].strip()
-            
-            # Validate wallet address
-            if len(wallet_address) < 10:
-                await event.reply("❌ Wallet address seems too short. Please check and try again.")
-                return
-            
-            # Load roles and wallets
-            roles = load_user_roles()
-            wallets = load_wallets()
-            
-            # Check if user is seller in this group
-            if chat_id not in roles or str(user.id) not in roles[chat_id]:
-                await event.reply("❌ You haven't selected a role in this group yet.")
-                return
-            
-            if roles[chat_id][str(user.id)]["role"] != "seller":
-                await event.reply("❌ Only the seller can set the seller wallet address.")
-                return
-            
-            # Save wallet address
-            if chat_id not in wallets:
-                wallets[chat_id] = {}
-            
-            wallets[chat_id]["seller"] = {
-                "address": wallet_address,
-                "set_by": user.id,
-                "set_at": time.time(),
-                "name": get_user_display(user)
-            }
-            
-            save_wallets(wallets)
-            
-            # Check if both wallets are set
-            both_set = False
-            if "buyer" in wallets.get(chat_id, {}) and "seller" in wallets.get(chat_id, {}):
-                both_set = True
-            
-            # Format wallet preview
-            if len(wallet_address) > 30:
-                wallet_preview = f"{wallet_address[:20]}...{wallet_address[-10:]}"
-            else:
-                wallet_preview = wallet_address
-            
-            # Send confirmation
-            status_message = '✅ Both wallets set! Ready for escrow.' if both_set else '⏳ Waiting for buyer wallet...'
-            
-            await event.reply(
-                f"✅ Seller wallet address saved!\n\n"
-                f"<code>{wallet_preview}</code>\n\n"
-                f"{status_message}",
-                parse_mode='html'
-            )
-            
-            # If both wallets are set, proceed to next step
-            if both_set:
-                await self.start_escrow(event.client, chat, chat_id)
-            
-        except Exception as e:
-            print(f"Error handling seller wallet: {e}")
-            await event.reply("❌ Error saving wallet address. Please try again.")
-    
-    async def start_escrow(self, client, chat, group_id):
-        """Start the escrow process after both wallets set"""
-        try:
-            # Load wallets and roles
-            wallets = load_wallets()
-            roles = load_user_roles()
-            
-            if group_id not in wallets:
-                return
-            
-            buyer_wallet = wallets[group_id].get("buyer", {})
-            seller_wallet = wallets[group_id].get("seller", {})
-            
-            if not buyer_wallet or not seller_wallet:
-                return
-            
-            # Get buyer and seller names from roles
-            buyer_name = "Buyer"
-            seller_name = "Seller"
-            
-            if group_id in roles:
-                for user_data in roles[group_id].values():
-                    if user_data["role"] == "buyer":
-                        buyer_name = user_data["name"]
-                    elif user_data["role"] == "seller":
-                        seller_name = user_data["name"]
-            
-            # Format wallet previews
-            buyer_wallet_preview = f"{buyer_wallet['address'][:15]}...{buyer_wallet['address'][-10:]}"
-            seller_wallet_preview = f"{seller_wallet['address'][:15]}...{seller_wallet['address'][-10:]}"
-            
-            # Format message using template
-            message = ESCROW_READY_MESSAGE.format(
-                buyer_name=buyer_name,
-                seller_name=seller_name,
-                buyer_wallet=buyer_wallet_preview,
-                seller_wallet=seller_wallet_preview
-            )
-            
-            await client.send_message(
-                chat,
-                message,
-                parse_mode='html'
-            )
-            
-            print(f"🚀 Escrow ready in group: {chat.title}")
-            
-        except Exception as e:
-            print(f"Error starting escrow: {e}")
+            print(f"Error sending confirmation: {e}")
     
     async def delete_invite_link(self, client, chat):
         """Delete invite link when 2 users join"""
@@ -694,16 +489,13 @@ class EscrowBot:
             print("\n📋 Available Commands:")
             print("   /start - Start the bot")
             print("   /begin - Initiate escrow session (in groups)")
-            print("   /buyer [address] - Set buyer wallet")
-            print("   /seller [address] - Set seller wallet")
             print("\n⚡ Features:")
-            print("   • Creator anonymous admin promotion")
+            print("   • Creator anonymous admin")
             print("   • Auto welcome message with /begin")
-            print("   • Role selection with proper alerts")
-            print("   • Wallet address collection")
+            print("   • Clean role selection system")
+            print("   • No auto-response to messages")
             print("   • Auto invite link deletion")
-            print("   • Complete escrow workflow")
-            print("\n⚡ Bot is listening for messages...")
+            print("\n⚡ Bot is listening for commands only...")
             print("   Press Ctrl+C to stop")
             
             # Run until disconnected
