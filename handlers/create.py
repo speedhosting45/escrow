@@ -16,28 +16,15 @@ async def handle_create(event):
     Handle create escrow button click
     """
     try:
-        # Try to edit the message
         await event.edit(
             CREATE_MESSAGE,
             buttons=get_create_buttons(),
             parse_mode='html'
         )
-    except MessageNotModifiedError:
-        # Message already has this content, send a new one instead
-        try:
-            await event.delete()
-            await event.respond(
-                CREATE_MESSAGE,
-                buttons=get_create_buttons(),
-                parse_mode='html'
-            )
-        except Exception as e:
-            print(f"Error sending new message in create: {e}")
-            await event.answer("✅ Create escrow menu", alert=False)
     except Exception as e:
         print(f"Error in create handler: {e}")
         try:
-            await event.answer("❌ An error occurred.", alert=True)
+            await event.answer("✅ Create escrow menu", alert=False)
         except:
             pass
 
@@ -46,8 +33,8 @@ async def handle_create_p2p(event):
     Handle P2P deal selection - create private group
     """
     try:
-        # Edit the original message to show "creating" status
-        await event.edit(
+        # First, send a new processing message instead of editing
+        processing_msg = await event.respond(
             "🔄 <b>Creating P2P Escrow Group...</b>\n\n<blockquote>Please wait while we set up your secure escrow group</blockquote>",
             parse_mode='html'
         )
@@ -55,35 +42,27 @@ async def handle_create_p2p(event):
         user_id = event.sender_id
         group_link = await create_p2p_group(user_id, event.client)
         
+        # Delete the processing message
+        await processing_msg.delete()
+        
         # Send success message with group link
         if group_link:
             message = P2P_CREATED_MESSAGE.format(GROUP_INVITE_LINK=group_link)
-            await event.edit(
+            await event.respond(
                 message,
                 parse_mode='html',
-                link_preview=False
+                link_preview=False,
+                buttons=get_main_menu_buttons()
             )
         else:
-            # Restore original create menu on failure
-            await event.edit(
-                CREATE_MESSAGE,
-                buttons=get_create_buttons(),
-                parse_mode='html'
-            )
             await event.answer("❌ Failed to create group. Please try again.", alert=True)
             
     except Exception as e:
         print(f"Error in P2P handler: {e}")
-        # Restore original menu on error
         try:
-            await event.edit(
-                CREATE_MESSAGE,
-                buttons=get_create_buttons(),
-                parse_mode='html'
-            )
             await event.answer("❌ An error occurred. Please try again.", alert=True)
         except:
-            pass
+            await event.respond("❌ An error occurred. Please try again.")
 
 async def create_p2p_group(user_id, bot_client):
     """
@@ -117,18 +96,42 @@ async def create_p2p_group(user_id, bot_client):
             # Use InputPeerUser as fallback
             user_entity = types.InputPeerUser(user_id=user_id, access_hash=0)
         
-        # Create the private group using messages.CreateChatRequest
+        # Create the private group
         group_name = "P2P Escrow By @Siyorou #01"
         
-        # First, create the chat
-        created = await user_client(functions.messages.CreateChatRequest(
-            users=[user_entity],
-            title=group_name
-        ))
-        
-        # Extract the chat ID from the result
-        chat_id = created.chats[0].id
-        print(f"✅ Group created: {group_name} (ID: {chat_id})")
+        # METHOD 1: Try CreateChatRequest first
+        try:
+            created = await user_client(functions.messages.CreateChatRequest(
+                users=[user_entity],
+                title=group_name
+            ))
+            
+            chat_id = created.chats[0].id
+            print(f"✅ Group created via CreateChatRequest: {group_name} (ID: {chat_id})")
+            
+        except Exception as e:
+            print(f"⚠️ CreateChatRequest failed: {e}")
+            # METHOD 2: Try CreateChannelRequest for supergroups
+            try:
+                created = await user_client(functions.channels.CreateChannelRequest(
+                    title=group_name,
+                    about="P2P Escrow Group",
+                    megagroup=True,  # This makes it a supergroup
+                    broadcast=False
+                ))
+                
+                chat_id = created.chats[0].id
+                print(f"✅ Group created via CreateChannelRequest: {group_name} (ID: {chat_id})")
+                
+                # Add user to the new supergroup
+                await user_client(functions.channels.InviteToChannelRequest(
+                    channel=created.chats[0],
+                    users=[user_entity]
+                ))
+                
+            except Exception as e2:
+                print(f"❌ All group creation methods failed: {e2}")
+                return None
         
         # Get the chat entity
         chat_entity = await user_client.get_entity(chat_id)
@@ -142,39 +145,53 @@ async def create_p2p_group(user_id, bot_client):
             await user_client(functions.messages.AddChatUserRequest(
                 chat_id=chat_id,
                 user_id=bot_entity,
-                fwd_limit=100  # Number of recent messages to forward
+                fwd_limit=100
             ))
             print(f"✅ Bot added to group")
         except Exception as e:
-            print(f"⚠️ Could not add bot: {e}")
-            # Continue anyway - group is still created
-        
-        # Promote bot as admin
-        try:
-            # First, we need to get the bot participant in the chat
-            # Get full chat info
-            full_chat = await user_client(functions.messages.GetFullChatRequest(
-                chat_id=chat_id
-            ))
-            
-            # Find bot participant
-            bot_participant = None
-            for participant in full_chat.full_chat.participants.participants:
-                if hasattr(participant, 'user_id') and participant.user_id == bot_me.id:
-                    bot_participant = participant
-                    break
-            
-            if bot_participant:
-                # Promote bot as admin using EditChatAdminRequest
-                await user_client(functions.messages.EditChatAdminRequest(
-                    chat_id=chat_id,
-                    user_id=bot_entity,
-                    is_admin=True
+            print(f"⚠️ Could not add bot via AddChatUserRequest: {e}")
+            # Try alternative method for supergroups
+            try:
+                await user_client(functions.channels.InviteToChannelRequest(
+                    channel=chat_entity,
+                    users=[bot_entity]
                 ))
-                print(f"✅ Bot promoted as admin")
+                print(f"✅ Bot added via InviteToChannelRequest")
+            except Exception as e2:
+                print(f"⚠️ Could not add bot at all: {e2}")
+        
+        # Try to promote bot as admin
+        try:
+            # For regular groups
+            await user_client(functions.messages.EditChatAdminRequest(
+                chat_id=chat_id,
+                user_id=bot_entity,
+                is_admin=True
+            ))
+            print(f"✅ Bot promoted as admin")
         except Exception as e:
             print(f"⚠️ Could not promote bot as admin: {e}")
-            # Some chats might not support admin promotion
+            # For supergroups, use different method
+            try:
+                await user_client(functions.channels.EditAdminRequest(
+                    channel=chat_entity,
+                    user_id=bot_entity,
+                    admin_rights=types.ChatAdminRights(
+                        change_info=True,
+                        post_messages=True,
+                        edit_messages=True,
+                        delete_messages=True,
+                        ban_users=True,
+                        invite_users=True,
+                        pin_messages=True,
+                        add_admins=False,
+                        anonymous=False
+                    ),
+                    rank="Bot Admin"
+                ))
+                print(f"✅ Bot promoted as admin in supergroup")
+            except Exception as e2:
+                print(f"⚠️ Could not promote bot in supergroup: {e2}")
         
         # Create invite link
         try:
@@ -185,16 +202,26 @@ async def create_p2p_group(user_id, bot_client):
             print(f"✅ Invite link created: {invite_url}")
         except Exception as e:
             print(f"⚠️ Could not create invite link: {e}")
-            # Create a basic invite link as fallback
+            # Try supergroup method
             try:
-                # Try to get the chat's username for public link
-                if hasattr(chat_entity, 'username') and chat_entity.username:
-                    invite_url = f"https://t.me/{chat_entity.username}"
-                else:
-                    # For private chats/groups
-                    invite_url = f"https://t.me/c/{str(chat_id).replace('-100', '')}"
-            except:
-                invite_url = f"Group created successfully! ID: {chat_id}"
+                invite_link = await user_client(functions.channels.ExportInviteRequest(
+                    channel=chat_entity
+                ))
+                invite_url = str(invite_link.link)
+                print(f"✅ Supergroup invite link created: {invite_url}")
+            except Exception as e2:
+                print(f"⚠️ Could not create any invite link: {e2}")
+                # Create a basic link
+                try:
+                    # Remove the -100 prefix for t.me/c/ links
+                    if str(chat_id).startswith('-100'):
+                        short_id = str(chat_id)[4:]
+                        invite_url = f"https://t.me/c/{short_id}"
+                    else:
+                        invite_url = f"https://t.me/c/{chat_id}"
+                    print(f"✅ Basic link created: {invite_url}")
+                except:
+                    invite_url = f"Group created! Please check your Telegram chats."
         
         return invite_url
         
@@ -220,12 +247,7 @@ async def handle_create_other(event):
         )
     except Exception as e:
         print(f"Error in Other deal handler: {e}")
-        # Fallback to editing message if answer fails
         try:
-            await event.edit(
-                "<b>📦 Other Deal</b>\n\n<blockquote>This feature is coming soon...</blockquote>",
-                parse_mode='html',
-                buttons=get_main_menu_buttons()
-            )
+            await event.respond("📦 Other Deal selected! This feature is coming soon...")
         except:
             pass
