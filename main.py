@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Escrow Bot - Updated
+Main entry point for the Escrow Bot - Fixed /begin
 """
 import asyncio
 import logging
@@ -22,12 +22,7 @@ from handlers.about import handle_about
 from handlers.help import handle_help
 
 # Import utilities
-from utils.texts import (
-    START_MESSAGE, WELCOME_MESSAGE, SESSION_INITIATED_MESSAGE,
-    BUYER_CONFIRMED_MESSAGE, SELLER_CONFIRMED_MESSAGE,
-    ROLE_ALREADY_CHOSEN_MESSAGE, ROLE_ALREADY_TAKEN_MESSAGE,
-    WALLET_SETUP_MESSAGE, ESCROW_READY_MESSAGE
-)
+from utils.texts import START_MESSAGE
 from utils.buttons import get_main_menu_buttons
 
 # Setup logging
@@ -40,7 +35,6 @@ logger = logging.getLogger(__name__)
 # Track groups for invite management
 GROUPS_FILE = 'data/active_groups.json'
 USER_ROLES_FILE = 'data/user_roles.json'
-BEGIN_TRACK_FILE = 'data/begin_track.json'
 
 def load_groups():
     """Load active groups data"""
@@ -66,38 +60,16 @@ def save_user_roles(roles):
     with open(USER_ROLES_FILE, 'w') as f:
         json.dump(roles, f, indent=2)
 
-def load_begin_track():
-    """Load /begin tracking"""
-    if os.path.exists(BEGIN_TRACK_FILE):
-        with open(BEGIN_TRACK_FILE, 'r') as f:
-            return json.load(f)
-    return {}
-
-def save_begin_track(track):
-    """Save /begin tracking"""
-    with open(BEGIN_TRACK_FILE, 'w') as f:
-        json.dump(track, f, indent=2)
-
 def get_user_display(user_obj):
     """Get clean display name for user"""
     if user_obj.username:
         return f"@{user_obj.username}"
     else:
-        # Clean special characters but keep basic text
         name = user_obj.first_name or f"User_{user_obj.id}"
-        # Remove problematic formatting characters
+        # Clean special characters
         import re
         name = re.sub(r'[^\w\s@#]', '', name)
         return name.strip() or f"User_{user_obj.id}"
-
-def get_user_link(user_obj):
-    """Get user link for mentions - cleaned"""
-    name = user_obj.first_name or f"User_{user_obj.id}"
-    # Clean the name
-    import re
-    name = re.sub(r'[^\w\s]', '', name)
-    name = name.strip() or f"User_{user_obj.id}"
-    return f'<a href="tg://user?id={user_obj.id}">{name}</a>'
 
 class EscrowBot:
     def __init__(self):
@@ -147,8 +119,10 @@ class EscrowBot:
                 logger.error(f"Error in back handler: {e}")
                 await event.answer("❌ An error occurred.", alert=True)
         
-        # REMOVED: Auto-response to messages
-        # Bot will only respond to commands and button clicks
+        # Handle /begin command
+        @self.client.on(events.NewMessage(pattern='/begin'))
+        async def begin_handler(event):
+            await self.handle_begin_command(event)
         
         # Chat Action Handler for join notifications
         @self.client.on(events.ChatAction())
@@ -195,7 +169,7 @@ class EscrowBot:
                         groups[chat_id] = group_data
                         save_groups(groups)
                         
-                        # Check if we have 2 members
+                        # Check member count
                         member_count = len(group_data["members"])
                         print(f"👤 User {user_id} joined group: {chat.title} (Total: {member_count})")
                         
@@ -275,15 +249,21 @@ class EscrowBot:
                 
                 # Send role confirmation message to group
                 if role == "buyer":
-                    confirm_msg = BUYER_CONFIRMED_MESSAGE.format(
-                        buyer_id=sender.id,
-                        buyer_name=get_user_display(sender)
-                    )
+                    confirm_msg = f"""
+<b>Buyer Role Confirmed</b>
+
+<a href="tg://user?id={sender.id}">{get_user_display(sender)}</a> registered as <b>Buyer</b>.
+
+Role cannot be changed.
+"""
                 else:
-                    confirm_msg = SELLER_CONFIRMED_MESSAGE.format(
-                        seller_id=sender.id,
-                        seller_name=get_user_display(sender)
-                    )
+                    confirm_msg = f"""
+<b>Seller Role Confirmed</b>
+
+<a href="tg://user?id={sender.id}">{get_user_display(sender)}</a> registered as <b>Seller</b>.
+
+Role cannot be changed.
+"""
                 
                 await event.client.send_message(
                     chat,
@@ -299,7 +279,7 @@ class EscrowBot:
                 
                 # When both buyer and seller have selected roles
                 if buyer_count >= 1 and seller_count >= 1:
-                    await self.send_wallet_setup(event.client, chat, group_id, roles[group_id])
+                    await self.send_roles_confirmed(event.client, chat, group_id, roles[group_id])
                 
             except Exception as e:
                 print(f"Error in role handler: {e}")
@@ -315,13 +295,13 @@ class EscrowBot:
             # Load groups data
             groups = load_groups()
             if chat_id not in groups:
+                print(f"❌ Group {chat_id} not found in groups data")
                 return
             
             group_data = groups[chat_id]
             
-            # Check if /begin already used
-            begin_track = load_begin_track()
-            if chat_id in begin_track and begin_track[chat_id]:
+            # Check if session already initiated
+            if group_data.get("session_initiated", False):
                 await event.reply("⚠️ Escrow session has already been initiated.")
                 return
             
@@ -331,7 +311,7 @@ class EscrowBot:
                 await event.reply("⏳ Waiting for both participants to join...")
                 return
             
-            # Get bot username from group data or config
+            # Get bot username
             bot_username = group_data.get("bot_username", BOT_USERNAME)
             if not bot_username:
                 me = await self.client.get_me()
@@ -348,14 +328,8 @@ class EscrowBot:
                 user1_display = get_user_display(user1)
                 user2_display = get_user_display(user2)
                 
-                # Format display names for message
-                display_text = ""
-                if user1.username or user2.username:
-                    # Show usernames if available
-                    display_text = f"{user1_display} • {user2_display}"
-                else:
-                    # Show clean names
-                    display_text = f"{user1_display} • {user2_display}"
+                # Format display
+                display_text = f"{user1_display} • {user2_display}"
                 
                 # Format session initiation message
                 message = f"""
@@ -392,9 +366,10 @@ Role selection is final.
                     buttons=buttons
                 )
                 
-                # Mark /begin as used
-                begin_track[chat_id] = True
-                save_begin_track(begin_track)
+                # Mark session as initiated
+                group_data["session_initiated"] = True
+                groups[chat_id] = group_data
+                save_groups(groups)
                 
                 print(f"🚀 Escrow session initiated by {get_user_display(user)} in group: {chat.title}")
                 
@@ -405,8 +380,8 @@ Role selection is final.
         except Exception as e:
             print(f"Error handling /begin command: {e}")
     
-    async def send_wallet_setup(self, client, chat, group_id, user_roles):
-        """Send wallet setup instructions after roles confirmed"""
+    async def send_roles_confirmed(self, client, chat, group_id, user_roles):
+        """Send roles confirmed message"""
         try:
             # Find buyer and seller
             buyer = None
@@ -491,10 +466,11 @@ Wallet setup will be handled in next phase.
             print("   /begin - Initiate escrow session (in groups)")
             print("\n⚡ Features:")
             print("   • Creator anonymous admin")
-            print("   • Auto welcome message with /begin")
-            print("   • Clean role selection system")
+            print("   • Clean group creation (no user addition)")
+            print("   • Auto welcome message pinned")
+            print("   • Working /begin command")
+            print("   • Role selection system")
             print("   • No auto-response to messages")
-            print("   • Auto invite link deletion")
             print("\n⚡ Bot is listening for commands only...")
             print("   Press Ctrl+C to stop")
             
