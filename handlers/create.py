@@ -1,25 +1,22 @@
 #!/usr/bin/env python3
 """
-Create escrow handlers with enhanced logging
+Create escrow handlers - Simplified version
 """
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
-from telethon.errors import MessageNotModifiedError, FloodWaitError
 from telethon import Button
-from utils.texts import CREATE_MESSAGE, P2P_CREATED_MESSAGE, OTHER_CREATED_MESSAGE
-from utils.buttons import get_create_buttons, get_main_menu_buttons
-from config import STRING_SESSION1, API_ID, API_HASH, increment_group_count, add_active_group, get_next_group_number
+from config import STRING_SESSION1, API_ID, API_HASH, get_next_number
 from telethon import TelegramClient
 import asyncio
-import time
-import json
-import os
 
 async def handle_create(event):
     """
     Handle create escrow button click
     """
     try:
+        from utils.texts import CREATE_MESSAGE
+        from utils.buttons import get_create_buttons
+        
         await event.edit(
             CREATE_MESSAGE,
             buttons=get_create_buttons(),
@@ -27,180 +24,162 @@ async def handle_create(event):
         )
     except Exception as e:
         print(f"Error in create handler: {e}")
-        try:
-            await event.answer("✅ Create escrow menu", alert=False)
-        except:
-            pass
+        await event.answer("✅ Create escrow menu", alert=False)
 
 async def handle_create_p2p(event):
     """
-    Handle P2P deal selection - create private group
+    Handle P2P deal selection
     """
     try:
-        # First, send a new processing message
-        processing_msg = await event.respond(
-            "🔄 <b>Creating P2P Escrow Group...</b>\n\n<blockquote>Please wait while we set up your secure escrow group</blockquote>",
+        # Show processing
+        await event.edit(
+            "🔄 <b>Creating P2P Escrow Group...</b>\n\n<blockquote>Please wait...</blockquote>",
             parse_mode='html'
         )
         
-        user_id = event.sender_id
-        user_entity = await event.client.get_entity(user_id)
-        user_username = f"@{user_entity.username}" if user_entity.username else f"User_{user_id}"
+        # Get bot username
         bot_username = (await event.client.get_me()).username
         
         # Get group number
-        counter = get_next_group_number()
-        group_number = counter.get("p2p", 1)
+        group_number = get_next_number("p2p")
         group_name = f"P2P Escrow By @Siyorou #{group_number:02d}"
         
-        group_link = await create_escrow_group(
-            user_id, 
-            user_username, 
-            bot_username, 
-            event.client,
-            group_name,
-            "p2p"
-        )
+        # Create group
+        result = await create_escrow_group(group_name, bot_username, "p2p")
         
-        # Delete the processing message
-        await processing_msg.delete()
-        
-        # Send success message with group link
-        if group_link:
+        if result and "invite_url" in result:
+            from utils.texts import P2P_CREATED_MESSAGE
+            
+            # Create message with join button
             message = P2P_CREATED_MESSAGE.format(
                 GROUP_NAME=group_name,
-                GROUP_INVITE_LINK=group_link
+                GROUP_INVITE_LINK=result["invite_url"]
             )
-            # Create join button
+            
             join_button = [
-                [Button.url("🔗 Join Now", group_link)],
+                [Button.url("🔗 Join Group", result["invite_url"])],
                 [Button.inline("🏠 Main Menu", b"back_to_main")]
             ]
             
-            await event.respond(
+            await event.edit(
                 message,
                 parse_mode='html',
                 link_preview=False,
                 buttons=join_button
             )
+            
+            # Print log to console
+            print("\n" + "="*60)
+            print(f"✅ GROUP CREATED SUCCESSFULLY")
+            print(f"📛 Group Name: {group_name}")
+            print(f"🔗 Invite Link: {result['invite_url']}")
+            print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
+            print(f"🤖 Bot Added: @{bot_username}")
+            print(f"👑 Bot Promoted: YES")
+            print("="*60 + "\n")
         else:
-            await event.answer("❌ Failed to create group. Please try again.", alert=True)
+            await event.edit(
+                "❌ <b>Failed to create group</b>\n\n<blockquote>Please try again later</blockquote>",
+                parse_mode='html',
+                buttons=[Button.inline("🔄 Try Again", b"create")]
+            )
             
     except Exception as e:
         print(f"Error in P2P handler: {e}")
-        try:
-            await event.answer("❌ An error occurred. Please try again.", alert=True)
-        except:
-            await event.respond("❌ An error occurred. Please try again.")
+        await event.edit(
+            "❌ <b>Error creating group</b>\n\n<blockquote>Please try again</blockquote>",
+            parse_mode='html',
+            buttons=[Button.inline("🔄 Try Again", b"create")]
+        )
 
 async def handle_create_other(event):
     """
-    Handle Other deal selection - create private group
+    Handle Other deal selection
     """
     try:
-        # First, send a new processing message
-        processing_msg = await event.respond(
-            "🔄 <b>Creating Other Deal Escrow Group...</b>\n\n<blockquote>Please wait while we set up your secure escrow group</blockquote>",
+        # Show processing
+        await event.edit(
+            "🔄 <b>Creating Other Deal Escrow Group...</b>\n\n<blockquote>Please wait...</blockquote>",
             parse_mode='html'
         )
         
-        user_id = event.sender_id
-        user_entity = await event.client.get_entity(user_id)
-        user_username = f"@{user_entity.username}" if user_entity.username else f"User_{user_id}"
+        # Get bot username
         bot_username = (await event.client.get_me()).username
         
         # Get group number
-        counter = get_next_group_number()
-        group_number = counter.get("other", 1)
+        group_number = get_next_number("other")
         group_name = f"Other Deal Escrow #{group_number:02d}"
         
-        group_link = await create_escrow_group(
-            user_id, 
-            user_username, 
-            bot_username, 
-            event.client,
-            group_name,
-            "other"
-        )
+        # Create group
+        result = await create_escrow_group(group_name, bot_username, "other")
         
-        # Delete the processing message
-        await processing_msg.delete()
-        
-        # Send success message with group link
-        if group_link:
+        if result and "invite_url" in result:
+            from utils.texts import OTHER_CREATED_MESSAGE
+            
+            # Create message with join button
             message = OTHER_CREATED_MESSAGE.format(
                 GROUP_NAME=group_name,
-                GROUP_INVITE_LINK=group_link
+                GROUP_INVITE_LINK=result["invite_url"]
             )
-            # Create join button
+            
             join_button = [
-                [Button.url("🔗 Join Now", group_link)],
+                [Button.url("🔗 Join Group", result["invite_url"])],
                 [Button.inline("🏠 Main Menu", b"back_to_main")]
             ]
             
-            await event.respond(
+            await event.edit(
                 message,
                 parse_mode='html',
                 link_preview=False,
                 buttons=join_button
             )
+            
+            # Print log to console
+            print("\n" + "="*60)
+            print(f"✅ OTHER DEAL GROUP CREATED SUCCESSFULLY")
+            print(f"📛 Group Name: {group_name}")
+            print(f"🔗 Invite Link: {result['invite_url']}")
+            print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
+            print(f"🤖 Bot Added: @{bot_username}")
+            print(f"👑 Bot Promoted: YES")
+            print("="*60 + "\n")
         else:
-            await event.answer("❌ Failed to create group. Please try again.", alert=True)
+            await event.edit(
+                "❌ <b>Failed to create group</b>\n\n<blockquote>Please try again later</blockquote>",
+                parse_mode='html',
+                buttons=[Button.inline("🔄 Try Again", b"create")]
+            )
             
     except Exception as e:
         print(f"Error in Other deal handler: {e}")
-        try:
-            await event.answer("❌ An error occurred. Please try again.", alert=True)
-        except:
-            await event.respond("❌ An error occurred. Please try again.")
+        await event.edit(
+            "❌ <b>Error creating group</b>\n\n<blockquote>Please try again</blockquote>",
+            parse_mode='html',
+            buttons=[Button.inline("🔄 Try Again", b"create")]
+        )
 
-async def create_escrow_group(user_id, user_username, bot_username, bot_client, group_name, group_type="p2p"):
+async def create_escrow_group(group_name, bot_username, group_type):
     """
-    Create a private Telegram group using user session
+    Create a supergroup, add bot, and promote it
     """
     if not STRING_SESSION1:
         print("❌ STRING_SESSION1 not configured in .env")
         return None
     
-    if not API_ID or not API_HASH:
-        print("❌ API_ID or API_HASH not configured")
-        return None
-    
     user_client = None
-    invite_url = None
-    chat_id = None
-    
     try:
-        # Create user client using the session string
-        user_client = TelegramClient(
-            StringSession(STRING_SESSION1), 
-            API_ID, 
-            API_HASH
-        )
-        
+        # Start user client
+        user_client = TelegramClient(StringSession(STRING_SESSION1), API_ID, API_HASH)
         await user_client.start()
-        print(f"✅ User client started for group creation")
         
-        # Get dialogs to populate entity cache
-        try:
-            print("🔄 Getting dialogs to populate entity cache...")
-            dialogs = await user_client.get_dialogs(limit=10)
-            print(f"✅ Got {len(dialogs)} dialogs")
-        except Exception as e:
-            print(f"⚠️ Could not get dialogs: {e}")
+        print(f"✅ User client started")
+        print(f"🔄 Creating group: {group_name}")
         
-        # Get the bot entity
-        print(f"🔄 Getting bot entity: @{bot_username}")
+        # Get bot entity
         bot_entity = await user_client.get_entity(bot_username)
-        print(f"✅ Got bot entity: {bot_entity.id}")
+        print(f"✅ Got bot entity: @{bot_username}")
         
-        # Get user entity
-        print(f"🔄 Getting user entity: {user_id}")
-        user_entity = await user_client.get_entity(user_id)
-        print(f"✅ Got user entity: {user_id}")
-        
-        # Create the private group (supergroup)
-        print(f"🔄 Creating supergroup: {group_name}")
+        # Create supergroup
         created = await user_client(functions.channels.CreateChannelRequest(
             title=group_name,
             about=f"Secure {group_type.upper()} Escrow Group",
@@ -208,30 +187,13 @@ async def create_escrow_group(user_id, user_username, bot_username, bot_client, 
             broadcast=False
         ))
         
-        # The result contains a list of chats
+        # Get channel info
         chat = created.chats[0]
         chat_id = chat.id
         channel = types.InputPeerChannel(channel_id=chat.id, access_hash=chat.access_hash)
-        print(f"✅ Supergroup created: {group_name} (ID: {chat_id})")
+        print(f"✅ Supergroup created: {chat_id}")
         
-        # LOG: Increment counters and store stats
-        increment_result = increment_group_count(group_type)
-        total_groups = increment_result["total_groups"]
-        group_number = increment_result["group_number"]
-        add_active_group(str(chat_id), user_username, group_type)
-        
-        # Send log message
-        await send_creation_log(bot_client, chat_id, user_username, group_name, total_groups, group_type)
-        
-        # Add the user to the group
-        print("🔄 Adding user to group...")
-        await user_client(functions.channels.InviteToChannelRequest(
-            channel=channel,
-            users=[user_entity]
-        ))
-        print(f"✅ User added to group")
-        
-        # Add the bot to the group
+        # Add bot to group
         print("🔄 Adding bot to group...")
         await user_client(functions.channels.InviteToChannelRequest(
             channel=channel,
@@ -239,87 +201,48 @@ async def create_escrow_group(user_id, user_username, bot_username, bot_client, 
         ))
         print(f"✅ Bot added to group")
         
+        # Promote bot as admin
+        print("🔄 Promoting bot as admin...")
+        await user_client(functions.channels.EditAdminRequest(
+            channel=channel,
+            user_id=bot_entity,
+            admin_rights=types.ChatAdminRights(
+                change_info=True,
+                post_messages=True,
+                edit_messages=True,
+                delete_messages=True,
+                ban_users=True,
+                invite_users=True,
+                pin_messages=True,
+                add_admins=False,
+                anonymous=False
+            ),
+            rank="Bot Admin"
+        ))
+        print(f"✅ Bot promoted as admin")
+        
         # Create invite link
         print("🔄 Creating invite link...")
         invite_link = await user_client(functions.messages.ExportChatInviteRequest(
             peer=channel
         ))
         invite_url = str(invite_link.link)
-        print(f"✅ Invite link created: {invite_url}")
+        print(f"✅ Invite link created")
         
-        # Store invite link for future revocation
-        store_invite_link(str(chat_id), invite_url, group_type, group_name)
+        # Return result
+        return {
+            "group_id": chat_id,
+            "invite_url": invite_url,
+            "group_name": group_name
+        }
         
-        return invite_url
-        
-    except FloodWaitError as e:
-        print(f"⏳ Flood wait error: Need to wait {e.seconds} seconds")
-        await asyncio.sleep(e.seconds)
-        return None
     except Exception as e:
-        print(f"❌ Error creating group: {e}")
+        print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()
         return None
+        
     finally:
-        # Always disconnect user client
         if user_client and user_client.is_connected():
             await user_client.disconnect()
             print(f"✅ User client disconnected")
-
-async def send_creation_log(bot_client, chat_id, created_by, group_name, total_groups, group_type):
-    """
-    Send group creation log
-    """
-    try:
-        log_message = f"""
-<b>#NEW_GROUP_CREATED</b>
-
-<blockquote>
-New {group_type.upper()} Escrow Group Created Successfully!
-</blockquote>
-
-• <b>CREATED BY</b> : {created_by}
-• <b>GROUP NAME</b> : {group_name}
-• <b>GROUP ID</b> : <code>{chat_id}</code>
-• <b>GROUPS CREATED TILL NOW</b> : {total_groups}
-• <b>GROUP TYPE</b> : {group_type.upper()}
-
-Group is ready for secure transactions.
-"""
-        
-        # Print to console
-        print("📝" + "="*50)
-        print(log_message)
-        print("="*50)
-        
-        # You can also send to your own user ID or a channel
-        # Example: await bot_client.send_message(YOUR_USER_ID, log_message, parse_mode='html')
-        
-    except Exception as e:
-        print(f"Error sending creation log: {e}")
-
-def store_invite_link(group_id, invite_url, group_type, group_name):
-    """
-    Store invite link for future revocation
-    """
-    try:
-        data = {}
-        if os.path.exists('data/invite_links.json'):
-            with open('data/invite_links.json', 'r') as f:
-                data = json.load(f)
-        
-        data[group_id] = {
-            "link": invite_url,
-            "group_name": group_name,
-            "group_type": group_type,
-            "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "revoked": False,
-            "users_joined": 0
-        }
-        
-        with open('data/invite_links.json', 'w') as f:
-            json.dump(data, f, indent=2)
-        print(f"✅ Invite link stored for group {group_id}")
-    except Exception as e:
-        print(f"Error storing invite link: {e}")
