@@ -86,26 +86,69 @@ A secure escrow solution built for Telegram
 
 More features coming soon 🚀
 """
-# Add these new text templates to your existing texts.py
+# Welcome message that gets pinned
+WELCOME_MESSAGE = """
+🤝 <b>Welcome to P2P Escrow by @{bot_username}</b>
 
-ROLE_SELECTION_MESSAGE = """
-<b>👋 Welcome!</b>
-
-<blockquote>
-Participants:
-• {user1}  
-• {user2}
-</blockquote>
-
-<b>Please choose your role:</b>
-🛒 Buyer  
-💼 Seller  
-
-<blockquote>
-⚠️ <b>Note:</b> Once a role is selected, it <b>cannot be changed</b>.
-</blockquote>
+To initiate this deal:
+<code>/begin</code>
 """
 
+# Session initiation message
+SESSION_INITIATED_MESSAGE = """
+<b>🔐 @{bot_username} P2P Escrow Session Initiated</b>
+
+Participants:
+<a href="tg://user?id={user1_id}">{user1_name}</a> • <a href="tg://user?id={user2_id}">{user2_name}</a>
+
+This escrow session is governed by verified rules to ensure a fair and secure trade.
+
+<b>Please declare your role to proceed:</b>
+
+<code>
+Buyer  → Select Buyer role
+Seller → Select Seller role
+</code>
+
+<b>Important:</b>
+Role selection is final and cannot be modified once confirmed.
+"""
+
+# Buyer role confirmation
+BUYER_CONFIRMED_MESSAGE = """
+<b>Buyer Role Confirmed</b>
+
+<a href="tg://user?id={buyer_id}">{buyer_name}</a> has been registered as the <b>Buyer</b> for this escrow session.
+
+This role is now <b>locked</b> and cannot be changed.
+"""
+
+# Seller role confirmation  
+SELLER_CONFIRMED_MESSAGE = """
+<b>Seller Role Confirmed</b>
+
+<a href="tg://user?id={seller_id}">{seller_name}</a> has been registered as the <b>Seller</b> for this escrow session.
+
+This role is now <b>locked</b> and cannot be changed.
+"""
+
+# Role already chosen (same user)
+ROLE_ALREADY_CHOSEN_MESSAGE = """
+⛔ Role Already Chosen (Blocked)
+Action denied.
+
+Your role has already been declared and cannot be changed.
+"""
+
+# Role already taken (other user)
+ROLE_ALREADY_TAKEN_MESSAGE = """
+⚠️ Role Already Taken
+This role has already been assigned.
+
+Please select the remaining available role.
+"""
+
+# Wallet setup message
 WALLET_SETUP_MESSAGE = """
 <b>✅ Roles Are Confirmed</b>
 
@@ -127,6 +170,7 @@ Once submitted, they <b>cannot be changed</b>.
 </blockquote>
 """
 
+# Escrow ready message
 ESCROW_READY_MESSAGE = """
 🎉 <b>ESCROW READY TO START!</b> 🎉
 
@@ -160,19 +204,6 @@ ESCROW_READY_MESSAGE = """
 
 🔒 <b>SECURE ESCROW ACTIVE</b>
 """
-
-WALLET_SAVED_MESSAGE = """
-✅ {role} wallet address saved!
-
-<code>{wallet_preview}</code>
-
-{status_message}
-"""
-
-BUYER_ONLY_MESSAGE = "❌ Only the buyer can set the buyer wallet address."
-SELLER_ONLY_MESSAGE = "❌ Only the seller can set the seller wallet address."
-NO_ROLE_MESSAGE = "❌ You haven't selected a role in this group yet."
-INVALID_WALLET_MESSAGE = "❌ Wallet address seems too short. Please check and try again."
 
 HELP_MESSAGE = """
 <b>❓ Help & Support</b>
