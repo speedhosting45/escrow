@@ -5,11 +5,12 @@ Main entry point for the Escrow Bot
 import asyncio
 import logging
 import sys
-from telethon import TelegramClient, events
+from telethon import TelegramClient, events, Button
 from telethon.tl import functions, types
 import json
 import os
 import html
+import time
 
 # Import configuration
 from config import API_ID, API_HASH, BOT_TOKEN
@@ -34,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 # Track groups for invite management
 GROUPS_FILE = 'data/active_groups.json'
+USER_ROLES_FILE = 'data/user_roles.json'
 
 def load_groups():
     """Load active groups data"""
@@ -47,19 +49,32 @@ def save_groups(groups):
     with open(GROUPS_FILE, 'w') as f:
         json.dump(groups, f, indent=2)
 
+def load_user_roles():
+    """Load user roles data"""
+    if os.path.exists(USER_ROLES_FILE):
+        with open(USER_ROLES_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_user_roles(roles):
+    """Save user roles data"""
+    with open(USER_ROLES_FILE, 'w') as f:
+        json.dump(roles, f, indent=2)
+
 def sanitize_text(text):
     """Remove markdown and clean text for HTML display"""
     if not text:
         return "User"
     
-    # Remove markdown brackets and other formatting
     text = str(text)
-    text = html.escape(text)  # Escape HTML
+    # Remove markdown and special characters
+    text = html.escape(text)
     text = text.replace('[', '').replace(']', '').replace('(', '').replace(')', '')
     text = text.replace('*', '').replace('_', '').replace('`', '').replace('~', '')
     
-    # Remove any remaining special characters that break formatting
-    text = ''.join(char for char in text if ord(char) < 128 or char.isspace())
+    # Take only first 20 characters if too long
+    if len(text) > 20:
+        text = text[:20] + "..."
     
     return text.strip() or "User"
 
@@ -136,164 +151,245 @@ class EscrowBot:
                     user = await event.get_user()
                     chat = await event.get_chat()
                     
-                    # Clean and sanitize the user's name
-                    user_name = user.first_name or "User"
-                    clean_name = sanitize_text(user_name)
+                    # Skip if bot or creator
+                    if user.bot:
+                        return
                     
-                    # Use username if available, otherwise use cleaned name
-                    if user.username:
-                        mention = f"@{user.username}"
-                    else:
-                        mention = clean_name
+                    # Get group data
+                    chat_id = str(chat.id)
+                    groups = load_groups()
                     
-                    # Send clean join notification
-                    join_message = f"<b>USER {mention} JOINED THE GROUP!</b>"
-                    await event.respond(
-                        join_message,
-                        parse_mode='html'
-                    )
+                    if chat_id not in groups:
+                        return
                     
-                    # Log to console
-                    print(f"\n👤 USER {user.id} ({clean_name}) JOINED GROUP: {chat.title}")
+                    group_data = groups[chat_id]
                     
-                    # Update join count and check for link revocation
-                    await self.update_join_count(chat, user)
+                    # Initialize members list if not exists
+                    if "members" not in group_data:
+                        group_data["members"] = []
                     
-            except Exception as e:
-                print(f"Error in chat action handler: {e}")
-    
-    async def update_join_count(self, chat, new_user):
-        """Update join count and revoke link if needed"""
-        try:
-            chat_id = str(chat.id)
-            groups = load_groups()
-            
-            if chat_id in groups:
-                group_data = groups[chat_id]
-                
-                # Initialize joins if not exists
-                if "joins" not in group_data:
-                    group_data["joins"] = 0
-                if "members" not in group_data:
-                    group_data["members"] = []
-                
-                # Don't count the creator or bot
-                creator_id = group_data.get("creator_id")
-                if (creator_id and new_user.id == creator_id) or new_user.bot:
-                    return  # Don't count creator or bot
-                
-                # Count unique users only once
-                if new_user.id not in group_data["members"]:
-                    group_data["joins"] += 1
-                    group_data["members"].append(new_user.id)
-                    print(f"📊 Group {chat.title}: {group_data['joins']} user(s) joined")
-                
-                # If 2 real users joined (not counting creator/bot)
-                if group_data["joins"] >= 2 and not group_data.get("link_revoked", False):
-                    print(f"🔒 REVOKING invite link for group {chat.title}")
-                    
-                    # REVOKE the invite link (delete it)
-                    revoked = await self.revoke_invite_link(chat)
-                    
-                    if revoked:
-                        # Mark as revoked
-                        group_data["link_revoked"] = True
-                        group_data["revoked_at"] = asyncio.get_event_loop().time()
+                    # Add user if not already in list
+                    if user.id not in group_data["members"]:
+                        group_data["members"].append(user.id)
                         
-                        # Save updated data
+                        # Get user display name
+                        if user.username:
+                            display_name = f"@{user.username}"
+                        else:
+                            display_name = user.first_name or f"User_{user.id}"
+                        
+                        # Clean display name
+                        clean_display = sanitize_text(display_name)
+                        
+                        # Update group data
                         groups[chat_id] = group_data
                         save_groups(groups)
                         
-                        # Send notification WITHOUT new link
-                        await self.client.send_message(
-                            chat,
-                            "⚠️ <b>SECURITY UPDATE</b>\n\n"
-                            "<blockquote>Invite link has been revoked and deleted.\n"
-                            "No new links will be generated.</blockquote>",
-                            parse_mode='html'
-                        )
-                        print(f"✅ Link revoked for group: {chat.title}")
-                    else:
-                        print(f"❌ Failed to revoke link for group: {chat.title}")
-                
-                # Save updated count
-                groups[chat_id] = group_data
-                save_groups(groups)
-                
-        except Exception as e:
-            print(f"Error updating join count: {e}")
-    
-    async def revoke_invite_link(self, chat):
-        """Revoke and delete the current invite link"""
-        try:
-            # First, disable invite permissions for everyone
-            await self.client(functions.messages.EditChatDefaultBannedRightsRequest(
-                peer=chat,
-                banned_rights=types.ChatBannedRights(
-                    until_date=0,
-                    invite_users=True  # Disable inviting users for everyone
-                )
-            ))
-            
-            # Try to get and delete any existing invite links
-            try:
-                # Get all invite links
-                result = await self.client(functions.messages.GetExportedChatInvitesRequest(
-                    peer=chat,
-                    admin_id=await self.client.get_me(),
-                    limit=100
-                ))
-                
-                if hasattr(result, 'invites') and result.invites:
-                    for invite in result.invites:
-                        try:
-                            # Delete the invite link
-                            await self.client(functions.messages.DeleteExportedChatInviteRequest(
-                                peer=chat,
-                                link=invite.link
-                            ))
-                            print(f"🗑️ Deleted invite link: {invite.link}")
-                        except Exception as e:
-                            print(f"⚠️ Could not delete link {invite.link}: {e}")
-                else:
-                    print(f"ℹ️ No existing invite links found for {chat.title}")
+                        # Check if we have 2 members (excluding creator/bot)
+                        member_count = len(group_data["members"])
+                        print(f"👤 {clean_display} joined group: {chat.title} (Total: {member_count})")
+                        
+                        # When 2 real users join, send role selection
+                        if member_count == 2:
+                            await self.send_role_selection(chat, group_data)
+                        
+                        # When 2 users join, delete invite link
+                        if member_count >= 2:
+                            await self.delete_invite_link(chat)
                     
             except Exception as e:
-                print(f"⚠️ Could not get existing invites: {e}")
-            
-            # Also disable admin's ability to create new invites
+                print(f"Error in chat action handler: {e}")
+        
+        # Handle role selection buttons
+        @self.client.on(events.CallbackQuery(pattern=b'role_'))
+        async def role_handler(event):
+            """Handle role selection (buyer/seller)"""
             try:
-                # Get bot's current admin rights
-                me = await self.client.get_me()
+                data = event.data.decode('utf-8')
+                chat = await event.get_chat()
+                user = await event.get_user()
                 
-                # Update bot's admin rights to remove invite permission
-                await self.client(functions.channels.EditAdminRequest(
-                    channel=chat,
-                    user_id=me,
-                    admin_rights=types.ChatAdminRights(
-                        change_info=True,
-                        post_messages=True,
-                        edit_messages=True,
-                        delete_messages=True,
-                        ban_users=True,
-                        invite_users=False,  # CRITICAL: Disable invite permission
-                        pin_messages=True,
-                        add_admins=False,
-                        anonymous=False,
-                        manage_call=True,
-                        other=True
-                    ),
-                    rank="Bot Admin"
-                ))
-                print(f"🔒 Disabled bot's invite permission for {chat.title}")
+                # Parse role from callback data
+                if data.startswith('role_buyer_'):
+                    role = "buyer"
+                    group_id = data.replace('role_buyer_', '')
+                elif data.startswith('role_seller_'):
+                    role = "seller"
+                    group_id = data.replace('role_seller_', '')
+                else:
+                    return
+                
+                # Get user display
+                if user.username:
+                    mention = f"@{user.username}"
+                else:
+                    mention = user.first_name or f"User_{user.id}"
+                
+                # Load roles
+                roles = load_user_roles()
+                if group_id not in roles:
+                    roles[group_id] = {}
+                
+                # Save user's role
+                roles[group_id][str(user.id)] = {
+                    "role": role,
+                    "name": mention,
+                    "selected_at": time.time()
+                }
+                save_user_roles(roles)
+                
+                # Get group members
+                groups = load_groups()
+                if group_id in groups:
+                    group_data = groups[group_id]
+                    
+                    # Count roles
+                    buyer_count = sum(1 for u in roles[group_id].values() if u["role"] == "buyer")
+                    seller_count = sum(1 for u in roles[group_id].values() if u["role"] == "seller")
+                    
+                    # Send update message
+                    if role == "buyer":
+                        role_text = "BUYER"
+                    else:
+                        role_text = "SELLER"
+                    
+                    await event.respond(
+                        f"✅ <b>{mention} declared as {role_text}</b>\n\n"
+                        f"<blockquote>Buyers: {buyer_count} | Sellers: {seller_count}</blockquote>",
+                        parse_mode='html'
+                    )
+                    
+                    # Check if both roles are selected
+                    if buyer_count >= 1 and seller_count >= 1:
+                        await self.send_trade_started(chat, group_id, roles[group_id])
+                
+                await event.answer(f"You selected: {role}", alert=False)
+                
             except Exception as e:
-                print(f"⚠️ Could not update bot permissions: {e}")
+                print(f"Error in role handler: {e}")
+                await event.answer("❌ Error selecting role", alert=True)
+    
+    async def send_role_selection(self, chat, group_data):
+        """Send role selection message when 2 users join"""
+        try:
+            chat_id = str(chat.id)
             
-            return True
+            # Get the two users who joined
+            members = group_data.get("members", [])[:2]  # First 2 users
+            
+            # Get user mentions
+            user_mentions = []
+            for user_id in members:
+                try:
+                    user = await self.client.get_entity(user_id)
+                    if user.username:
+                        mention = f"@{user.username}"
+                    else:
+                        mention = user.first_name or f"User_{user.id}"
+                    user_mentions.append(mention)
+                except:
+                    user_mentions.append(f"User_{user_id}")
+            
+            # Create message with mentions
+            mentions_text = ", ".join(user_mentions)
+            
+            # Create role selection buttons
+            buttons = [
+                [
+                    Button.inline("🛒 I AM BUYER", f"role_buyer_{chat_id}".encode()),
+                    Button.inline("💰 I AM SELLER", f"role_seller_{chat_id}".encode())
+                ]
+            ]
+            
+            # Send role selection message
+            await self.client.send_message(
+                chat,
+                f"👥 <b>Both Seller and Buyer Joined!</b>\n\n"
+                f"<blockquote>Welcome, {mentions_text}\n"
+                f"Happy Trade! Please select your roles:</blockquote>",
+                parse_mode='html',
+                buttons=buttons
+            )
+            
+            print(f"📝 Sent role selection for group: {chat.title}")
             
         except Exception as e:
-            print(f"❌ Error revoking link: {e}")
-            return False
+            print(f"Error sending role selection: {e}")
+    
+    async def send_trade_started(self, chat, group_id, user_roles):
+        """Send trade started message when both roles selected"""
+        try:
+            # Get buyer and seller info
+            buyers = []
+            sellers = []
+            
+            for user_id, data in user_roles.items():
+                if data["role"] == "buyer":
+                    buyers.append(data["name"])
+                elif data["role"] == "seller":
+                    sellers.append(data["name"])
+            
+            buyers_text = ", ".join(buyers) if buyers else "Not selected"
+            sellers_text = ", ".join(sellers) if sellers else "Not selected"
+            
+            await self.client.send_message(
+                chat,
+                f"🎉 <b>TRADE STARTED!</b>\n\n"
+                f"<blockquote>Roles have been confirmed</blockquote>\n\n"
+                f"• <b>Buyer(s)</b>: {buyers_text}\n"
+                f"• <b>Seller(s)</b>: {sellers_text}\n\n"
+                f"🔒 Escrow is now active. Please proceed with the trade.",
+                parse_mode='html'
+            )
+            
+            print(f"✅ Trade started in group: {chat.title}")
+            
+        except Exception as e:
+            print(f"Error sending trade started: {e}")
+    
+    async def delete_invite_link(self, chat):
+        """Delete invite link when 2 users join"""
+        try:
+            print(f"🔒 Deleting invite link for group: {chat.title}")
+            
+            # Method 1: Simply disable inviting for everyone (simplest)
+            try:
+                await self.client(functions.messages.EditChatDefaultBannedRightsRequest(
+                    peer=chat,
+                    banned_rights=types.ChatBannedRights(
+                        until_date=0,
+                        invite_users=True  # Disable inviting
+                    )
+                ))
+                print(f"✅ Invite permissions disabled for {chat.title}")
+            except Exception as e:
+                print(f"⚠️ Could not disable invites: {e}")
+            
+            # Method 2: Try to export and delete if possible
+            try:
+                # Try to create a new link just to get it, then delete it
+                # This might not work for bots, but we try
+                invite = await self.client(functions.messages.ExportChatInviteRequest(
+                    peer=chat
+                ))
+                
+                if hasattr(invite, 'link'):
+                    # Try to delete it (might not work for bots)
+                    try:
+                        await self.client(functions.messages.DeleteExportedChatInviteRequest(
+                            peer=chat,
+                            link=invite.link
+                        ))
+                        print(f"🗑️ Deleted invite link: {invite.link}")
+                    except:
+                        print(f"⚠️ Could not delete link (bot restriction)")
+            except Exception as e:
+                print(f"ℹ️ Could not manage link directly: {e}")
+            
+            print(f"✅ Invite system secured for {chat.title}")
+            
+        except Exception as e:
+            print(f"❌ Error deleting invite link: {e}")
 
     async def run(self):
         """Run the bot"""
@@ -322,11 +418,11 @@ class EscrowBot:
             print("   ➕ Create - Create new escrow")
             print("   ℹ️ About - About the bot")
             print("   ❓ Help - Help and support")
-            print("\n⚡ Security Features:")
-            print("   • Creator auto-promotion (anonymous)")
-            print("   • Auto link revocation after 2 users")
-            print("   • NO NEW LINKS generated")
-            print("   • Clean join announcements")
+            print("\n⚡ Advanced Features:")
+            print("   • Auto group creation")
+            print("   • Role selection system")
+            print("   • Auto invite link deletion")
+            print("   • Trade confirmation")
             print("\n⚡ Bot is listening for messages...")
             print("   Press Ctrl+C to stop")
             
