@@ -1,5 +1,6 @@
 import os
 import json
+import time  # ADD THIS IMPORT
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,6 +15,9 @@ STRING_SESSION1 = os.getenv('STRING_SESSION1', '')
 
 # Stats file path
 STATS_FILE = 'data/stats.json'
+
+# Counter for group numbers
+GROUP_COUNTER_FILE = 'data/group_counter.json'
 
 # Ensure data directory exists
 os.makedirs('data', exist_ok=True)
@@ -30,14 +34,39 @@ def save_stats(stats):
     with open(STATS_FILE, 'w') as f:
         json.dump(stats, f, indent=2)
 
-def increment_group_count():
-    """Increment total groups counter"""
+def get_next_group_number():
+    """Get next sequential group number"""
+    if os.path.exists(GROUP_COUNTER_FILE):
+        with open(GROUP_COUNTER_FILE, 'r') as f:
+            counter = json.load(f)
+    else:
+        counter = {"p2p": 1, "other": 1}
+    
+    return counter
+
+def save_group_number(counter):
+    """Save group counter"""
+    with open(GROUP_COUNTER_FILE, 'w') as f:
+        json.dump(counter, f, indent=2)
+
+def increment_group_count(group_type="p2p"):
+    """Increment total groups counter and get next number"""
     stats = load_stats()
     stats["total_groups"] = stats.get("total_groups", 0) + 1
     save_stats(stats)
-    return stats["total_groups"]
+    
+    counter = get_next_group_number()
+    next_number = counter.get(group_type, 1)
+    counter[group_type] = next_number + 1
+    save_group_number(counter)
+    
+    return {
+        "total_groups": stats["total_groups"],
+        "group_number": next_number,
+        "counter": counter
+    }
 
-def add_active_group(group_id, created_by):
+def add_active_group(group_id, created_by, group_type="p2p"):
     """Add group to active groups list"""
     stats = load_stats()
     if "active_groups" not in stats:
@@ -46,6 +75,7 @@ def add_active_group(group_id, created_by):
     group_info = {
         "id": group_id,
         "created_by": created_by,
+        "type": group_type,
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "link_revoked": False
     }
@@ -56,10 +86,3 @@ def get_group_count():
     """Get total groups count"""
     stats = load_stats()
     return stats.get("total_groups", 0)
-
-def increment_user_joined():
-    """Increment users joined counter"""
-    stats = load_stats()
-    stats["users_joined"] = stats.get("users_joined", 0) + 1
-    save_stats(stats)
-    return stats["users_joined"]
