@@ -62,9 +62,3 @@ How this escrow bot works
 
 Need help? Contact admin.
 """
-
-ERROR_MESSAGES = {
-    'unknown': "❌ An error occurred. Please try again.",
-    'access_denied': "⛔ You don't have permission to perform this action.",
-    'invalid_input': "⚠️ Invalid input. Please check and try again.",
-}
