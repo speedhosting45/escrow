@@ -82,7 +82,87 @@ class EscrowBot:
                     await event.answer("❌ An error occurred.", alert=True)
                 except:
                     pass
+        # Add this to your main.py in the setup_handlers() method:
+
+@self.client.on(events.ChatAction)
+async def chat_action_handler(event):
+    """
+    Handle user joins to groups
+    """
+    try:
+        # Check if it's a user join
+        if event.user_joined or event.user_added:
+            user = await event.get_user()
+            chat = await event.get_chat()
+            
+            # Get user info
+            username = f"@{user.username}" if user.username else f"User_{user.id}"
+            
+            # Send notification to the group
+            await event.reply(
+                f"<b>USER {username} JOINED THE GROUP !</b>\n\n"
+                f"Welcome to the escrow group!",
+                parse_mode='html'
+            )
+            print(f"👤 {username} joined group: {chat.title}")
+            
+            # Check if we need to revoke link after 2 users join
+            await check_and_revoke_link(event, chat)
+            
+    except Exception as e:
+        print(f"Error in chat action handler: {e}")
+
+async def check_and_revoke_link(event, chat):
+    """
+    Check if link needs to be revoked after 2 users join
+    """
+    try:
+        # Get current participants count
+        participants = await event.client.get_participants(chat)
         
+        # If we have 3 participants (creator + 2 users)
+        if len(participants) >= 3:
+            # Try to revoke the current invite link
+            try:
+                await event.client(functions.messages.EditChatDefaultBannedRightsRequest(
+                    peer=chat,
+                    banned_rights=types.ChatBannedRights(
+                        until_date=0,
+                        view_messages=True,
+                        send_messages=True,
+                        send_media=True,
+                        send_stickers=True,
+                        send_gifs=True,
+                        send_games=True,
+                        send_inline=True,
+                        embed_links=True,
+                        send_polls=True,
+                        change_info=True,
+                        invite_users=False,  # Keep invite ability for admin
+                        pin_messages=True
+                    )
+                ))
+                
+                # Create new invite link
+                new_link = await event.client(functions.messages.ExportChatInviteRequest(
+                    peer=chat
+                ))
+                
+                # Send message about new link
+                await event.respond(
+                    f"<b>⚠️ SECURITY UPDATE</b>\n\n"
+                    f"<blockquote>Old invite link has been revoked.\n"
+                    f"New invite link generated for admin use.</blockquote>\n\n"
+                    f"New link: {new_link.link}",
+                    parse_mode='html'
+                )
+                print(f"🔒 Invite link revoked for group: {chat.title}")
+                
+            except Exception as e:
+                print(f"Could not revoke link: {e}")
+                
+    except Exception as e:
+        print(f"Error checking participant count: {e}")
         @self.client.on(events.NewMessage)
         async def message_handler(event):
             """Handle other messages"""
