@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create escrow handlers - Updated with anonymous admin
+Create escrow handlers - Clean version (no user addition)
 """
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
@@ -104,7 +104,6 @@ async def handle_create_p2p(event):
             print(f"🤖 Bot Added: @{bot_username}")
             print(f"👑 Creator Promoted: YES (Anonymous Admin)")
             print(f"📌 Welcome Message Pinned: YES")
-            print(f"⚠️ Invite auto-delete: AFTER 2 USERS JOIN")
             print("="*60 + "\n")
             
         else:
@@ -175,7 +174,6 @@ async def handle_create_other(event):
             print(f"🤖 Bot Added: @{bot_username}")
             print(f"👑 Creator Promoted: YES (Anonymous Admin)")
             print(f"📌 Welcome Message Pinned: YES")
-            print(f"⚠️ Invite auto-delete: AFTER 2 USERS JOIN")
             print("="*60 + "\n")
             
         else:
@@ -195,7 +193,7 @@ async def handle_create_other(event):
 
 async def create_escrow_group(group_name, bot_username, group_type, bot_client):
     """
-    Create a supergroup, add bot, promote creator as anonymous admin, and pin welcome message
+    Create a supergroup, add bot ONLY, promote creator as anonymous admin, and pin welcome message
     """
     if not STRING_SESSION1:
         print("❌ STRING_SESSION1 not configured in .env")
@@ -218,7 +216,7 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
         creator = await user_client.get_me()
         print(f"✅ Creator: @{creator.username if creator.username else creator.id}")
         
-        # Create supergroup
+        # Create supergroup - EMPTY (no users added)
         created = await user_client(functions.channels.CreateChannelRequest(
             title=group_name,
             about=f"Secure {group_type.upper()} Escrow Group",
@@ -280,7 +278,7 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
             except Exception as e2:
                 print(f"❌ Could not promote creator at all: {e2}")
         
-        # Add bot to group
+        # Add bot to group (NO USERS ADDED)
         print("🔄 Adding bot to group...")
         await user_client(functions.channels.InviteToChannelRequest(
             channel=channel,
@@ -371,8 +369,9 @@ def store_group_data(group_id, group_name, group_type, creator_id, bot_username)
             "type": group_type,
             "creator_id": creator_id,
             "bot_username": bot_username,
-            "members": [],
+            "members": [],  # Start empty, will be filled when users join
             "welcome_pinned": True,
+            "session_initiated": False,  # Track if /begin has been used
             "created_at": asyncio.get_event_loop().time()
         }
         
