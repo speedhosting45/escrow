@@ -5,9 +5,33 @@ Create escrow handlers - Simplified version
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
 from telethon import Button
-from config import STRING_SESSION1, API_ID, API_HASH, get_next_number
+from config import STRING_SESSION1, API_ID, API_HASH
 from telethon import TelegramClient
 import asyncio
+import json
+import os
+
+# Define get_next_number locally if import fails
+def get_next_number(group_type="p2p"):
+    """Get next sequential group number"""
+    COUNTER_FILE = 'data/counter.json'
+    try:
+        if os.path.exists(COUNTER_FILE):
+            with open(COUNTER_FILE, 'r') as f:
+                counter = json.load(f)
+        else:
+            counter = {"p2p": 1, "other": 1}
+        
+        number = counter.get(group_type, 1)
+        counter[group_type] = number + 1
+        
+        with open(COUNTER_FILE, 'w') as f:
+            json.dump(counter, f, indent=2)
+        
+        return number
+    except Exception as e:
+        print(f"Error in get_next_number: {e}")
+        return 1
 
 async def handle_create(event):
     """
