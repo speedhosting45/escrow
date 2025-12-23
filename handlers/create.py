@@ -1,6 +1,12 @@
 from telethon import events
-from ..utils.texts import CREATE_MESSAGE
-from ..utils.buttons import get_create_buttons
+import sys
+import os
+
+# Add parent directory to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.texts import CREATE_MESSAGE
+from utils.buttons import get_create_buttons
 
 async def handle_create(event):
     """
