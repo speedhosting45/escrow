@@ -4,9 +4,10 @@ Create escrow handlers
 """
 from telethon.sessions import StringSession
 from telethon.tl import functions
+from telethon.errors import MessageNotModifiedError
 from utils.texts import CREATE_MESSAGE, P2P_CREATED_MESSAGE
-from utils.buttons import get_create_buttons
-from config import STRING_SESSION1, API_ID, API_HASH, BOT_TOKEN
+from utils.buttons import get_create_buttons, get_main_menu_buttons
+from config import STRING_SESSION1, API_ID, API_HASH
 from telethon import TelegramClient
 import asyncio
 
@@ -15,40 +16,81 @@ async def handle_create(event):
     Handle create escrow button click
     """
     try:
+        # Try to edit the message
         await event.edit(
             CREATE_MESSAGE,
             buttons=get_create_buttons(),
             parse_mode='html'
         )
+    except MessageNotModifiedError:
+        # Message already has this content, send a new one instead
+        try:
+            await event.delete()
+            await event.respond(
+                CREATE_MESSAGE,
+                buttons=get_create_buttons(),
+                parse_mode='html'
+            )
+        except Exception as e:
+            print(f"Error sending new message in create: {e}")
+            await event.answer("✅ Create escrow menu", alert=False)
     except Exception as e:
         print(f"Error in create handler: {e}")
-        await event.answer("❌ An error occurred.", alert=True)
+        try:
+            await event.answer("❌ An error occurred.", alert=True)
+        except:
+            pass
 
 async def handle_create_p2p(event):
     """
     Handle P2P deal selection - create private group
     """
     try:
-        # First show "processing" message
-        await event.answer("Creating P2P escrow group...", alert=True)
+        # Delete the "Creating..." popup after a delay
+        await event.delete()
+        
+        # Show processing message
+        processing_msg = await event.respond(
+            "🔄 Creating P2P escrow group... Please wait."
+        )
         
         user_id = event.sender_id
         group_link = await create_p2p_group(user_id, event.client)
         
+        # Delete processing message
+        await processing_msg.delete()
+        
         # Send success message with group link
         if group_link:
             message = P2P_CREATED_MESSAGE.format(GROUP_INVITE_LINK=group_link)
-            await event.edit(
-                message,
-                parse_mode='html',
-                link_preview=False
-            )
+            
+            # Try to edit the original message first
+            try:
+                await event.edit(
+                    message,
+                    parse_mode='html',
+                    link_preview=False
+                )
+            except (MessageNotModifiedError, ValueError):
+                # If can't edit, send as new message
+                await event.respond(
+                    message,
+                    parse_mode='html',
+                    link_preview=False,
+                    buttons=get_main_menu_buttons()
+                )
         else:
-            await event.answer("❌ Failed to create group. Please try again.", alert=True)
+            try:
+                await event.answer("❌ Failed to create group. Please try again.", alert=True)
+            except:
+                await event.respond("❌ Failed to create group. Please try again.")
             
     except Exception as e:
         print(f"Error in P2P handler: {e}")
-        await event.answer("❌ An error occurred. Please try again.", alert=True)
+        try:
+            await event.answer("❌ An error occurred. Please try again.", alert=True)
+        except:
+            await event.respond("❌ An error occurred. Please try again.")
 
 async def create_p2p_group(user_id, bot_client):
     """
@@ -56,6 +98,10 @@ async def create_p2p_group(user_id, bot_client):
     """
     if not STRING_SESSION1:
         print("❌ STRING_SESSION1 not configured in .env")
+        return None
+    
+    if not API_ID or not API_HASH:
+        print("❌ API_ID or API_HASH not configured")
         return None
     
     try:
@@ -71,9 +117,17 @@ async def create_p2p_group(user_id, bot_client):
         
         # Create the private group
         group_name = "P2P Escrow By @Siyorou #01"
+        
+        # First, get the user entity
+        try:
+            user_entity = await user_client.get_entity(user_id)
+            users_to_add = [user_entity]
+        except:
+            users_to_add = [user_id]
+        
         group = await user_client.create_group(
             title=group_name,
-            users=[user_id]  # Add the user who clicked
+            users=users_to_add
         )
         print(f"✅ Group created: {group_name}")
         
@@ -81,8 +135,12 @@ async def create_p2p_group(user_id, bot_client):
         bot_me = await bot_client.get_me()
         
         # Add the bot to the group
-        await user_client.add_participants(group, bot_me.username)
-        print(f"✅ Bot added to group")
+        try:
+            await user_client.add_participants(group, bot_me.username)
+            print(f"✅ Bot added to group")
+        except Exception as e:
+            print(f"⚠️ Could not add bot: {e}")
+            # Continue anyway
         
         # Promote bot as admin
         try:
@@ -115,19 +173,32 @@ async def create_p2p_group(user_id, bot_client):
             print(f"⚠️ Could not promote bot as admin: {e}")
         
         # Create invite link
-        invite_link = await user_client(
-            functions.messages.ExportChatInviteRequest(
-                peer=group
+        try:
+            invite_link = await user_client(
+                functions.messages.ExportChatInviteRequest(
+                    peer=group
+                )
             )
-        )
+            invite_url = str(invite_link.link)
+            print(f"✅ Invite link created: {invite_url}")
+        except Exception as e:
+            print(f"⚠️ Could not create invite link: {e}")
+            # Get the group link as fallback
+            try:
+                entity = await user_client.get_entity(group)
+                invite_url = f"https://t.me/c/{entity.id}"
+            except:
+                invite_url = "Group created but could not get invite link"
         
         # Disconnect user client
         await user_client.disconnect()
         
-        return str(invite_link.link)
+        return invite_url
         
     except Exception as e:
         print(f"❌ Error creating group: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 async def handle_create_other(event):
@@ -141,3 +212,4 @@ async def handle_create_other(event):
         )
     except Exception as e:
         print(f"Error in Other deal handler: {e}")
+        await event.respond("📦 Other Deal selected! This feature is coming soon...")
