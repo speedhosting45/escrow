@@ -1,6 +1,12 @@
 from telethon import events
-from ..utils.texts import ABOUT_MESSAGE
-from ..utils.buttons import get_back_button
+import sys
+import os
+
+# Add parent directory to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.texts import ABOUT_MESSAGE
+from utils.buttons import get_back_button
 
 async def handle_about(event):
     """
