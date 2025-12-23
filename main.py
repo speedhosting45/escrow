@@ -6,8 +6,9 @@ import asyncio
 import logging
 import sys
 from telethon import TelegramClient, events
-from telethon.tl import types
 from telethon.tl import functions
+import json
+import os
 
 # Import configuration
 from config import API_ID, API_HASH, BOT_TOKEN
@@ -29,6 +30,21 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+# Track groups for invite management
+GROUPS_FILE = 'data/active_groups.json'
+
+def load_groups():
+    """Load active groups data"""
+    if os.path.exists(GROUPS_FILE):
+        with open(GROUPS_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_groups(groups):
+    """Save active groups data"""
+    with open(GROUPS_FILE, 'w') as f:
+        json.dump(groups, f, indent=2)
 
 class EscrowBot:
     def __init__(self):
@@ -103,80 +119,113 @@ class EscrowBot:
                     user = await event.get_user()
                     chat = await event.get_chat()
                     
-                    # Get user mention
+                    # Format user mention properly
                     if user.username:
                         mention = f"@{user.username}"
                     else:
-                        mention = f"[{user.first_name or 'User'}](tg://user?id={user.id})"
+                        # Clean formatting for name
+                        name = user.first_name or "User"
+                        # Remove any markdown/formatting from name
+                        name = name.replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+                        mention = f"{name}"
                     
-                    # Send join notification to the group
+                    # Send clean join notification
                     await event.respond(
-                        f"<b>USER {mention} JOINED THE GROUP !</b>",
+                        f"<b>USER {mention} JOINED THE GROUP!</b>",
                         parse_mode='html'
                     )
                     
                     # Log to console
-                    print(f"\n👤 USER {mention} JOINED GROUP: {chat.title}")
+                    print(f"\n👤 USER {user.id} JOINED GROUP: {chat.title}")
                     
-                    # Check participant count for link revocation
-                    await self.check_and_revoke_link(event, chat)
+                    # Update join count and check for link revocation
+                    await self.update_join_count(chat, user)
                     
             except Exception as e:
-                # Silently ignore errors in event handler
-                pass
-        
-        # Message event handler for group messages
-        @self.client.on(events.NewMessage(incoming=True))
-        async def new_message_handler(event):
-            """Handle new messages in groups"""
-            try:
-                # This can be extended for group-specific commands
-                pass
-            except Exception as e:
-                pass
+                print(f"Error in chat action handler: {e}")
     
-    async def check_and_revoke_link(self, event, chat):
-        """
-        Check if link needs to be revoked after 2 users join
-        """
+    async def update_join_count(self, chat, new_user):
+        """Update join count and revoke link if needed"""
         try:
-            # Get current participants count
-            participants = await event.client.get_participants(chat, limit=10)
+            chat_id = str(chat.id)
+            groups = load_groups()
             
-            # Count actual users (excluding bots if needed)
-            user_count = 0
-            for participant in participants:
-                if not participant.bot:
-                    user_count += 1
-            
-            # If we have 3 or more users (creator + 2+ users)
-            if user_count >= 3:
-                print(f"🔒 Group has {user_count} users, checking for link revocation...")
+            if chat_id in groups:
+                group_data = groups[chat_id]
                 
-                # Try to get current invite links
-                try:
-                    # Export a new invite link (this doesn't revoke old ones)
-                    new_link = await event.client(functions.messages.ExportChatInviteRequest(
-                        peer=chat
-                    ))
+                # Increment join count
+                if "joins" not in group_data:
+                    group_data["joins"] = 0
+                
+                # Don't count the creator or bot
+                if new_user.id != group_data.get("creator_id") and not new_user.bot:
+                    group_data["joins"] += 1
+                    print(f"📊 Group {chat.title}: {group_data['joins']} user(s) joined")
+                
+                # If 2 real users joined (not counting creator/bot)
+                if group_data["joins"] >= 2 and not group_data.get("link_revoked", False):
+                    print(f"🔒 Revoking invite link for group {chat.title}")
                     
-                    # Send message about security update
-                    await event.respond(
-                        f"<b>⚠️ SECURITY UPDATE</b>\n\n"
-                        f"<blockquote>Group has reached {user_count} members.\n"
-                        f"Please use new invite link for additional invites.</blockquote>\n\n"
-                        f"New admin link: {new_link.link}",
+                    # Revoke all invite links
+                    await self.revoke_invite_links(chat)
+                    
+                    # Mark as revoked
+                    group_data["link_revoked"] = True
+                    group_data["revoked_at"] = asyncio.get_event_loop().time()
+                    
+                    # Save updated data
+                    groups[chat_id] = group_data
+                    save_groups(groups)
+                    
+                    # Notify in group
+                    await self.client.send_message(
+                        chat,
+                        "⚠️ <b>SECURITY UPDATE</b>\n\n"
+                        "<blockquote>Invite link has been revoked for security.</blockquote>",
                         parse_mode='html'
                     )
-                    
-                    print(f"🔒 New invite link generated for group: {chat.title}")
-                    
-                except Exception as e:
-                    print(f"Could not generate new link: {e}")
-                    
+                
+                # Save updated count
+                groups[chat_id] = group_data
+                save_groups(groups)
+                
         except Exception as e:
-            print(f"Error checking participant count: {e}")
+            print(f"Error updating join count: {e}")
     
+    async def revoke_invite_links(self, chat):
+        """Revoke all invite links in the group"""
+        try:
+            # Revoke all invite links
+            await self.client(functions.messages.EditChatDefaultBannedRightsRequest(
+                peer=chat,
+                banned_rights=types.ChatBannedRights(
+                    until_date=0,
+                    invite_users=True  # Disable inviting users
+                )
+            ))
+            
+            # Get and delete any existing invite links
+            try:
+                invites = await self.client(functions.messages.GetExportedChatInvitesRequest(
+                    peer=chat,
+                    admin_id=await self.client.get_me(),
+                    limit=100
+                ))
+                
+                for invite in invites.invites:
+                    try:
+                        await self.client(functions.messages.DeleteExportedChatInviteRequest(
+                            peer=chat,
+                            link=invite.link
+                        ))
+                    except:
+                        pass
+            except:
+                pass
+                
+        except Exception as e:
+            print(f"Error revoking links: {e}")
+
     async def run(self):
         """Run the bot"""
         try:
@@ -204,11 +253,10 @@ class EscrowBot:
             print("   ➕ Create - Create new escrow")
             print("   ℹ️ About - About the bot")
             print("   ❓ Help - Help and support")
-            print("\n⚡ Features:")
-            print("   • Auto group creation")
-            print("   • Bot added as admin")
-            print("   • Join notifications")
-            print("   • Sequential numbering")
+            print("\n⚡ Security Features:")
+            print("   • Creator auto-promotion (anonymous)")
+            print("   • Auto link revocation after 2 users")
+            print("   • No new links shared publicly")
             print("\n⚡ Bot is listening for messages...")
             print("   Press Ctrl+C to stop")
             
