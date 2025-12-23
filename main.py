@@ -87,30 +87,39 @@ class EscrowBot:
 @self.client.on(events.ChatAction)
 async def chat_action_handler(event):
     """
-    Handle user joins to groups
+    Handle user joins to groups where bot is admin
     """
     try:
-        # Check if it's a user join
+        # Only process if bot is in the chat
+        if not event.is_group and not event.is_channel:
+            return
+            
+        # Check if user joined or was added
         if event.user_joined or event.user_added:
-            user = await event.get_user()
-            chat = await event.get_chat()
-            
-            # Get user info
-            username = f"@{user.username}" if user.username else f"User_{user.id}"
-            
-            # Send notification to the group
-            await event.reply(
-                f"<b>USER {username} JOINED THE GROUP !</b>\n\n"
-                f"Welcome to the escrow group!",
-                parse_mode='html'
-            )
-            print(f"👤 {username} joined group: {chat.title}")
-            
-            # Check if we need to revoke link after 2 users join
-            await check_and_revoke_link(event, chat)
-            
+            try:
+                # Get the user who joined
+                user = await event.get_user()
+                chat = await event.get_chat()
+                
+                # Get username or mention
+                if user.username:
+                    mention = f"@{user.username}"
+                else:
+                    mention = f"[{user.first_name or 'User'}](tg://user?id={user.id})"
+                
+                # Send join notification
+                await event.respond(
+                    f"<b>USER {mention} JOINED THE GROUP !</b>",
+                    parse_mode='html'
+                )
+                print(f"✅ USER {user.id} joined group: {chat.title}")
+                
+            except Exception as e:
+                print(f"Error in join handler: {e}")
+                
     except Exception as e:
-        print(f"Error in chat action handler: {e}")
+        # Silently ignore errors in event handler
+        pass
 
 async def check_and_revoke_link(event, chat):
     """
