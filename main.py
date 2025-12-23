@@ -6,7 +6,8 @@ import asyncio
 import logging
 import sys
 from telethon import TelegramClient, events
-from telethon.errors import MessageNotModifiedError
+from telethon.tl import types
+from telethon.tl import functions
 
 # Import configuration
 from config import API_ID, API_HASH, BOT_TOKEN
@@ -73,105 +74,10 @@ class EscrowBot:
                     buttons=get_main_menu_buttons(),
                     parse_mode='html'
                 )
-            except MessageNotModifiedError:
-                # Message already has this content
-                await event.answer("✅ Main menu", alert=False)
             except Exception as e:
                 logger.error(f"Error in back handler: {e}")
-                try:
-                    await event.answer("❌ An error occurred.", alert=True)
-                except:
-                    pass
-        # Add this to your main.py in the setup_handlers() method:
-
-@self.client.on(events.ChatAction)
-async def chat_action_handler(event):
-    """
-    Handle user joins to groups where bot is admin
-    """
-    try:
-        # Only process if bot is in the chat
-        if not event.is_group and not event.is_channel:
-            return
-            
-        # Check if user joined or was added
-        if event.user_joined or event.user_added:
-            try:
-                # Get the user who joined
-                user = await event.get_user()
-                chat = await event.get_chat()
-                
-                # Get username or mention
-                if user.username:
-                    mention = f"@{user.username}"
-                else:
-                    mention = f"[{user.first_name or 'User'}](tg://user?id={user.id})"
-                
-                # Send join notification
-                await event.respond(
-                    f"<b>USER {mention} JOINED THE GROUP !</b>",
-                    parse_mode='html'
-                )
-                print(f"✅ USER {user.id} joined group: {chat.title}")
-                
-            except Exception as e:
-                print(f"Error in join handler: {e}")
-                
-    except Exception as e:
-        # Silently ignore errors in event handler
-        pass
-
-async def check_and_revoke_link(event, chat):
-    """
-    Check if link needs to be revoked after 2 users join
-    """
-    try:
-        # Get current participants count
-        participants = await event.client.get_participants(chat)
+                await event.answer("❌ An error occurred.", alert=True)
         
-        # If we have 3 participants (creator + 2 users)
-        if len(participants) >= 3:
-            # Try to revoke the current invite link
-            try:
-                await event.client(functions.messages.EditChatDefaultBannedRightsRequest(
-                    peer=chat,
-                    banned_rights=types.ChatBannedRights(
-                        until_date=0,
-                        view_messages=True,
-                        send_messages=True,
-                        send_media=True,
-                        send_stickers=True,
-                        send_gifs=True,
-                        send_games=True,
-                        send_inline=True,
-                        embed_links=True,
-                        send_polls=True,
-                        change_info=True,
-                        invite_users=False,  # Keep invite ability for admin
-                        pin_messages=True
-                    )
-                ))
-                
-                # Create new invite link
-                new_link = await event.client(functions.messages.ExportChatInviteRequest(
-                    peer=chat
-                ))
-                
-                # Send message about new link
-                await event.respond(
-                    f"<b>⚠️ SECURITY UPDATE</b>\n\n"
-                    f"<blockquote>Old invite link has been revoked.\n"
-                    f"New invite link generated for admin use.</blockquote>\n\n"
-                    f"New link: {new_link.link}",
-                    parse_mode='html'
-                )
-                print(f"🔒 Invite link revoked for group: {chat.title}")
-                
-            except Exception as e:
-                print(f"Could not revoke link: {e}")
-                
-    except Exception as e:
-        print(f"Error checking participant count: {e}")
         @self.client.on(events.NewMessage)
         async def message_handler(event):
             """Handle other messages"""
@@ -183,6 +89,93 @@ async def check_and_revoke_link(event, chat):
                     )
                 except Exception as e:
                     logger.error(f"Error in message handler: {e}")
+        
+        # Chat Action Handler for join notifications
+        @self.client.on(events.ChatAction())
+        async def chat_action_handler(event):
+            """
+            Handle user joins to groups where bot is admin
+            """
+            try:
+                # Check if it's a user join event
+                if event.user_joined or event.user_added:
+                    # Get the user who joined
+                    user = await event.get_user()
+                    chat = await event.get_chat()
+                    
+                    # Get user mention
+                    if user.username:
+                        mention = f"@{user.username}"
+                    else:
+                        mention = f"[{user.first_name or 'User'}](tg://user?id={user.id})"
+                    
+                    # Send join notification to the group
+                    await event.respond(
+                        f"<b>USER {mention} JOINED THE GROUP !</b>",
+                        parse_mode='html'
+                    )
+                    
+                    # Log to console
+                    print(f"\n👤 USER {mention} JOINED GROUP: {chat.title}")
+                    
+                    # Check participant count for link revocation
+                    await self.check_and_revoke_link(event, chat)
+                    
+            except Exception as e:
+                # Silently ignore errors in event handler
+                pass
+        
+        # Message event handler for group messages
+        @self.client.on(events.NewMessage(incoming=True))
+        async def new_message_handler(event):
+            """Handle new messages in groups"""
+            try:
+                # This can be extended for group-specific commands
+                pass
+            except Exception as e:
+                pass
+    
+    async def check_and_revoke_link(self, event, chat):
+        """
+        Check if link needs to be revoked after 2 users join
+        """
+        try:
+            # Get current participants count
+            participants = await event.client.get_participants(chat, limit=10)
+            
+            # Count actual users (excluding bots if needed)
+            user_count = 0
+            for participant in participants:
+                if not participant.bot:
+                    user_count += 1
+            
+            # If we have 3 or more users (creator + 2+ users)
+            if user_count >= 3:
+                print(f"🔒 Group has {user_count} users, checking for link revocation...")
+                
+                # Try to get current invite links
+                try:
+                    # Export a new invite link (this doesn't revoke old ones)
+                    new_link = await event.client(functions.messages.ExportChatInviteRequest(
+                        peer=chat
+                    ))
+                    
+                    # Send message about security update
+                    await event.respond(
+                        f"<b>⚠️ SECURITY UPDATE</b>\n\n"
+                        f"<blockquote>Group has reached {user_count} members.\n"
+                        f"Please use new invite link for additional invites.</blockquote>\n\n"
+                        f"New admin link: {new_link.link}",
+                        parse_mode='html'
+                    )
+                    
+                    print(f"🔒 New invite link generated for group: {chat.title}")
+                    
+                except Exception as e:
+                    print(f"Could not generate new link: {e}")
+                    
+        except Exception as e:
+            print(f"Error checking participant count: {e}")
     
     async def run(self):
         """Run the bot"""
@@ -211,6 +204,11 @@ async def check_and_revoke_link(event, chat):
             print("   ➕ Create - Create new escrow")
             print("   ℹ️ About - About the bot")
             print("   ❓ Help - Help and support")
+            print("\n⚡ Features:")
+            print("   • Auto group creation")
+            print("   • Bot added as admin")
+            print("   • Join notifications")
+            print("   • Sequential numbering")
             print("\n⚡ Bot is listening for messages...")
             print("   Press Ctrl+C to stop")
             
