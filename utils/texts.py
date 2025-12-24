@@ -171,3 +171,4 @@ HELP_MESSAGE = """
 6. Confirmation & Release – Buyer verifies, funds released
 
 <blockquote>For protocol clarification or dispute assistance, contact designated administrators.</blockquote>
+"""
