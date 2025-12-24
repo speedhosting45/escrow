@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create escrow handlers - Professional version with correct execution order
+Create escrow handlers - Version with delayed welcome message
 """
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
@@ -87,7 +87,7 @@ async def handle_create_p2p(event):
         group_name = f"P2P Escrow #{group_number:02d}"
         
         # Create group
-        result = await create_escrow_group(group_name, bot_username, "p2p", event.client)
+        result = await create_escrow_group(group_name, bot_username, "p2p", event.client, user.id)
         
         if result and "invite_url" in result:
             from utils.texts import P2P_CREATED_MESSAGE
@@ -121,10 +121,10 @@ async def handle_create_p2p(event):
             print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
             print(f"🤖 Bot: @{bot_username}")
             print(f"🔧 Features:")
-            print(f"   ✓ Creator promoted as Anonymous Admin")
-            print(f"   ✓ Welcome message pinned")
-            print(f"   ✓ History hidden for new users")
-            print(f"   ✓ Custom bio configured")
+            print(f"   ✓ History hidden until first join")
+            print(f"   ✓ Creator as Anonymous Admin")
+            print(f"   ✓ Bot added as admin")
+            print(f"   ✓ Welcome message ready (will pin on first join)")
             print("═"*60)
             
         else:
@@ -176,7 +176,7 @@ async def handle_create_other(event):
         group_name = f"Other Deal #{group_number:02d}"
         
         # Create group
-        result = await create_escrow_group(group_name, bot_username, "other", event.client)
+        result = await create_escrow_group(group_name, bot_username, "other", event.client, user.id)
         
         if result and "invite_url" in result:
             from utils.texts import OTHER_CREATED_MESSAGE
@@ -210,10 +210,10 @@ async def handle_create_other(event):
             print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
             print(f"🤖 Bot: @{bot_username}")
             print(f"🔧 Features:")
-            print(f"   ✓ Creator promoted as Anonymous Admin")
-            print(f"   ✓ Welcome message pinned")
-            print(f"   ✓ History hidden for new users")
-            print(f"   ✓ Custom bio configured")
+            print(f"   ✓ History hidden until first join")
+            print(f"   ✓ Creator as Anonymous Admin")
+            print(f"   ✓ Bot added as admin")
+            print(f"   ✓ Welcome message ready (will pin on first join)")
             print("═"*60)
             
         else:
@@ -231,15 +231,13 @@ async def handle_create_other(event):
             buttons=[Button.inline("🔄 Try Again", b"create")]
         )
 
-async def create_escrow_group(group_name, bot_username, group_type, bot_client):
+async def create_escrow_group(group_name, bot_username, group_type, bot_client, creator_user_id):
     """
-    Create a supergroup with correct execution order:
-    1. Create group
-    2. Add bot
-    3. Make history hidden
-    4. Change group name
-    5. Make history visible
-    6. Send and pin welcome message
+    Create a supergroup with:
+    1. History hidden
+    2. Creator as anonymous admin
+    3. Bot added as admin
+    4. Welcome message WILL BE SENT AND PINNED when first user joins
     """
     if not STRING_SESSION1:
         print("[ERROR] STRING_SESSION1 not configured in .env")
@@ -262,11 +260,11 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
         creator_name = creator.username if creator.username else f"ID:{creator.id}"
         print(f"[INFO] Creator: @{creator_name}")
         
-        # STEP 1: Create supergroup (empty)
-        print("[STEP 1/7] Creating supergroup...")
+        # STEP 1: Create supergroup
+        print("[STEP 1/5] Creating supergroup...")
         created = await user_client(functions.channels.CreateChannelRequest(
             title=group_name,
-            about="Secure escrow transaction group",
+            about=f"🔐 Secure {group_type.upper()} Escrow Group\n\nEscrowed by @{bot_username}",
             megagroup=True,
             broadcast=False
         ))
@@ -276,81 +274,49 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
         channel = types.InputPeerChannel(channel_id=chat.id, access_hash=chat.access_hash)
         print(f"[SUCCESS] Supergroup created with ID: {chat_id}")
         
-        # STEP 2: Add bot to group
-        print("[STEP 2/7] Adding bot to group...")
+        # STEP 2: Hide history for ALL users (including new)
+        print("[STEP 2/5] Hiding group history...")
+        try:
+            await user_client(functions.channels.TogglePreHistoryHiddenRequest(
+                channel=channel,
+                enabled=True  # True = Hide history for everyone
+            ))
+            print("[SUCCESS] Group history hidden (no one can see old messages)")
+        except Exception as e:
+            print(f"[WARNING] Could not hide history: {e}")
+        
+        # STEP 3: Promote creator as ANONYMOUS admin
+        print("[STEP 3/5] Promoting creator as anonymous admin...")
+        try:
+            await user_client(functions.channels.EditAdminRequest(
+                channel=channel,
+                user_id=creator,
+                admin_rights=ChatAdminRights(
+                    change_info=True,
+                    post_messages=True,
+                    edit_messages=True,
+                    delete_messages=True,
+                    ban_users=True,
+                    invite_users=True,
+                    pin_messages=True,
+                    add_admins=True,
+                    anonymous=True,  # CRITICAL: Anonymous admin
+                    manage_call=True,
+                    other=True
+                ),
+                rank="Owner"
+            ))
+            print("[SUCCESS] Creator promoted as anonymous admin")
+        except Exception as e:
+            print(f"[ERROR] Could not promote creator: {e}")
+        
+        # STEP 4: Add bot and promote as admin
+        print("[STEP 4/5] Adding and promoting bot...")
         await user_client(functions.channels.InviteToChannelRequest(
             channel=channel,
             users=[bot_entity]
         ))
-        print("[SUCCESS] Bot added to group")
         
-        # STEP 3: Make history hidden for new users
-        print("[STEP 3/7] Hiding pre-history for new users...")
-        try:
-            await user_client(functions.channels.TogglePreHistoryHiddenRequest(
-                channel=channel,
-                enabled=True  # True = Hide history for new users
-            ))
-            print("[SUCCESS] History hidden for new users")
-        except Exception as e:
-            print(f"[WARNING] Could not hide history: {e}")
-        
-        # STEP 4: Set custom group name and bio
-        print("[STEP 4/7] Setting group name and bio...")
-        try:
-            # Update group name
-            await user_client(functions.channels.EditTitleRequest(
-                channel=channel,
-                title=group_name
-            ))
-            
-            # Set custom bio
-            custom_bio = f"🔐 This group is being escrowed by @{bot_username}\n\n🧑‍💼 Seller : \n🧑‍💼 Buyer  :"
-            await user_client(functions.channels.EditAboutRequest(
-                channel=channel,
-                about=custom_bio
-            ))
-            print("[SUCCESS] Group name and bio updated")
-        except Exception as e:
-            print(f"[WARNING] Could not update group info: {e}")
-        
-        # STEP 5: Make history visible again (required for welcome message to be seen)
-        print("[STEP 5/7] Making history visible...")
-        try:
-            await user_client(functions.channels.TogglePreHistoryHiddenRequest(
-                channel=channel,
-                enabled=False  # False = Make history visible
-            ))
-            print("[SUCCESS] History made visible")
-        except Exception as e:
-            print(f"[WARNING] Could not make history visible: {e}")
-        
-        # STEP 6: Send and pin welcome message
-        print("[STEP 6/7] Sending and pinning welcome message...")
-        from utils.texts import WELCOME_MESSAGE
-        welcome_msg = WELCOME_MESSAGE.format(bot_username=bot_username)
-        
-        # Send welcome message
-        sent_message = await user_client.send_message(
-            channel,
-            welcome_msg,
-            parse_mode='html'
-        )
-        
-        # Pin the welcome message
-        await user_client.pin_message(channel, sent_message, notify=False)
-        print("[SUCCESS] Welcome message pinned")
-        
-        # STEP 7: Create invite link and promote admin
-        print("[STEP 7/7] Finalizing setup...")
-        
-        # Create initial invite link
-        invite_link = await user_client(functions.messages.ExportChatInviteRequest(
-            peer=channel
-        ))
-        invite_url = str(invite_link.link)
-        
-        # Promote bot as admin
         await user_client(functions.channels.EditAdminRequest(
             channel=channel,
             user_id=bot_entity,
@@ -369,44 +335,34 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
             ),
             rank="Escrow Bot"
         ))
+        print("[SUCCESS] Bot added and promoted")
         
-        # Promote creator as anonymous admin
-        try:
-            await user_client(functions.channels.EditAdminRequest(
-                channel=channel,
-                user_id=creator,
-                admin_rights=ChatAdminRights(
-                    change_info=True,
-                    post_messages=True,
-                    edit_messages=True,
-                    delete_messages=True,
-                    ban_users=True,
-                    invite_users=True,
-                    pin_messages=True,
-                    add_admins=True,
-                    anonymous=True,
-                    manage_call=True,
-                    other=True
-                ),
-                rank="Owner"
-            ))
-            print("[SUCCESS] Creator promoted as anonymous admin")
-        except:
-            print("[INFO] Creator admin rights already set")
+        # STEP 5: Create invite link
+        print("[STEP 5/5] Creating invite link...")
+        invite_link = await user_client(functions.messages.ExportChatInviteRequest(
+            peer=channel
+        ))
+        invite_url = str(invite_link.link)
         
-        print("[COMPLETE] Group setup finished successfully")
+        print("[COMPLETE] Group setup finished - Waiting for first user to join")
+        print(f"[NOTE] Welcome message will be sent and pinned when first user joins")
+        print(f"[NOTE] Telegram service messages will be auto-deleted")
+        print(f"[NOTE] Commands won't work until 2 members join (excluding bot)")
         
-        # Store group data
-        store_group_data(chat_id, group_name, group_type, creator.id, bot_username, creator_name)
+        # Store group data with special flag for first join
+        store_group_data(chat_id, group_name, group_type, creator.id, bot_username, creator_name, creator_user_id)
         
         return {
             "group_id": chat_id,
             "invite_url": invite_url,
             "group_name": group_name,
             "creator_id": creator.id,
+            "creator_user_id": creator_user_id,  # From bot client
             "creator_username": creator_name,
             "bot_username": bot_username,
-            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "history_hidden": True,
+            "welcome_sent": False  # Flag to track if welcome was sent
         }
         
     except Exception as e:
@@ -420,7 +376,7 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
             await user_client.disconnect()
             print("[INFO] User client disconnected")
 
-def store_group_data(group_id, group_name, group_type, creator_id, bot_username, creator_username):
+def store_group_data(group_id, group_name, group_type, creator_id, bot_username, creator_username, creator_user_id):
     """Store group data for tracking"""
     try:
         GROUPS_FILE = 'data/active_groups.json'
@@ -439,13 +395,15 @@ def store_group_data(group_id, group_name, group_type, creator_id, bot_username,
             "name": group_name,
             "type": group_type,
             "creator_id": creator_id,
+            "creator_user_id": creator_user_id,  # From bot client
             "creator_username": creator_username,
             "bot_username": bot_username,
             "original_id": str(group_id),
             "members": [],
-            "welcome_pinned": True,
             "history_hidden": True,
-            "custom_bio_set": True,
+            "welcome_sent": False,  # Track if welcome message was sent
+            "welcome_message_id": None,
+            "first_join_processed": False,
             "session_initiated": False,
             "created_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             "created_timestamp": time.time()
