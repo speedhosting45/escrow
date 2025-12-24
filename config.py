@@ -15,6 +15,12 @@ STRING_SESSION1 = os.getenv('STRING_SESSION1', '')
 # Bot username (will be set dynamically)
 BOT_USERNAME = ""
 
+# Add these to your config.py file
+
+# Image URLs
+OTC_IMAGE = "https://files.catbox.moe/f6lzpr.png"
+P2P_IMAGE = "https://files.catbox.moe/ieiejo.png"
+
 # Ensure data directory exists
 os.makedirs('data', exist_ok=True)
 
