@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create escrow handlers - Updated with hidden history and custom bio
+Create escrow handlers - Professional version with animated progress
 """
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
@@ -11,6 +11,8 @@ from telethon import TelegramClient
 import asyncio
 import json
 import os
+from datetime import datetime
+import time
 
 # Define get_next_number locally
 def get_next_number(group_type="p2p"):
@@ -31,7 +33,7 @@ def get_next_number(group_type="p2p"):
         
         return number
     except Exception as e:
-        print(f"Error in get_next_number: {e}")
+        print(f"[ERROR] get_next_number: {e}")
         return 1
 
 async def handle_create(event):
@@ -48,24 +50,37 @@ async def handle_create(event):
             parse_mode='html'
         )
     except Exception as e:
-        print(f"Error in create handler: {e}")
+        print(f"[ERROR] create handler: {e}")
         await event.answer("✅ Create escrow menu", alert=False)
 
 async def handle_create_p2p(event):
     """
-    Handle P2P deal selection
+    Handle P2P deal selection with animation
     """
     try:
-        # Show processing
-        await event.edit(
-            "🔄 <b>Creating P2P Escrow Group...</b>\n\n<blockquote>Please wait...</blockquote>",
-            parse_mode='html'
-        )
+        # Get user mention
+        user = await event.get_sender()
+        mention = user.first_name
+        if user.username:
+            mention = f"@{user.username}"
+        
+        # Create animation sequence
+        animation_messages = [
+            f"<b>🔐 Creating Group</b>\n\n<blockquote>Creating group please wait {mention}.</blockquote>",
+            f"<b>🔐 Creating Group</b>\n\n<blockquote>Creating group please wait {mention}..</blockquote>",
+            f"<b>🔐 Creating Group</b>\n\n<blockquote>Creating group please wait {mention}...</blockquote>",
+            f"<b>✅ Group Created Successfully</b>\n\n<blockquote>Setting up escrow features...</blockquote>"
+        ]
+        
+        # Show animation
+        for msg in animation_messages:
+            await event.edit(msg, parse_mode='html')
+            await asyncio.sleep(0.8)
         
         # Get bot info
         bot = await event.client.get_me()
         bot_username = bot.username
-        set_bot_username(bot_username)  # Set globally
+        set_bot_username(bot_username)
         
         # Get group number
         group_number = get_next_number("p2p")
@@ -77,13 +92,12 @@ async def handle_create_p2p(event):
         if result and "invite_url" in result:
             from utils.texts import P2P_CREATED_MESSAGE
             
-            # Create message with ONLY join button
+            # Create message with join button
             message = P2P_CREATED_MESSAGE.format(
                 GROUP_NAME=group_name,
                 GROUP_INVITE_LINK=result["invite_url"]
             )
             
-            # Only show join button, no main menu
             join_button = [
                 [Button.url("🔗 Join Group Now", result["invite_url"])]
             ]
@@ -95,49 +109,67 @@ async def handle_create_p2p(event):
                 buttons=join_button
             )
             
-            # Print log to console
-            print("\n" + "="*60)
-            print(f"✅ P2P GROUP CREATED SUCCESSFULLY")
+            # Professional console log
+            print("\n" + "═"*60)
+            print("📊 ESCROW GROUP CREATION REPORT")
+            print("═"*60)
+            print(f"📅 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"👤 Created by: {mention}")
+            print(f"🆔 Creator ID: {user.id}")
             print(f"📛 Group Name: {group_name}")
-            print(f"🔗 Initial Invite: {result['invite_url']}")
+            print(f"🔗 Invite Link: {result['invite_url']}")
             print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
-            print(f"🤖 Bot Added: @{bot_username}")
-            print(f"👑 Creator Promoted: YES (Anonymous Admin)")
-            print(f"📌 Welcome Message Pinned: YES")
-            print(f"👻 History Hidden: YES (New users won't see old messages)")
-            print(f"📝 Custom Bio Set: YES")
-            print("="*60 + "\n")
+            print(f"🤖 Bot: @{bot_username}")
+            print(f"🔧 Features:")
+            print(f"   ✓ Creator promoted as Anonymous Admin")
+            print(f"   ✓ Welcome message pinned")
+            print(f"   ✓ History hidden for new users")
+            print(f"   ✓ Custom bio configured")
+            print("═"*60)
             
         else:
             await event.edit(
-                "❌ <b>Failed to create group</b>\n\n<blockquote>Please try again later</blockquote>",
+                "<b>❌ Failed to Create Group</b>\n\n<blockquote>Please try again later</blockquote>",
                 parse_mode='html',
                 buttons=[Button.inline("🔄 Try Again", b"create")]
             )
             
     except Exception as e:
-        print(f"Error in P2P handler: {e}")
+        print(f"[ERROR] P2P handler: {e}")
         await event.edit(
-            "❌ <b>Error creating group</b>\n\n<blockquote>Please try again</blockquote>",
+            "<b>❌ Error Creating Group</b>\n\n<blockquote>Technical issue detected</blockquote>",
             parse_mode='html',
             buttons=[Button.inline("🔄 Try Again", b"create")]
         )
 
 async def handle_create_other(event):
     """
-    Handle Other deal selection
+    Handle Other deal selection with animation
     """
     try:
-        # Show processing
-        await event.edit(
-            "🔄 <b>Creating Other Deal Escrow Group...</b>\n\n<blockquote>Please wait...</blockquote>",
-            parse_mode='html'
-        )
+        # Get user mention
+        user = await event.get_sender()
+        mention = user.first_name
+        if user.username:
+            mention = f"@{user.username}"
+        
+        # Create animation sequence
+        animation_messages = [
+            f"<b>🔐 Creating Deal Group</b>\n\n<blockquote>Creating group please wait {mention}.</blockquote>",
+            f"<b>🔐 Creating Deal Group</b>\n\n<blockquote>Creating group please wait {mention}..</blockquote>",
+            f"<b>🔐 Creating Deal Group</b>\n\n<blockquote>Creating group please wait {mention}...</blockquote>",
+            f"<b>✅ Group Created Successfully</b>\n\n<blockquote>Setting up escrow features...</blockquote>"
+        ]
+        
+        # Show animation
+        for msg in animation_messages:
+            await event.edit(msg, parse_mode='html')
+            await asyncio.sleep(0.8)
         
         # Get bot info
         bot = await event.client.get_me()
         bot_username = bot.username
-        set_bot_username(bot_username)  # Set globally
+        set_bot_username(bot_username)
         
         # Get group number
         group_number = get_next_number("other")
@@ -149,13 +181,12 @@ async def handle_create_other(event):
         if result and "invite_url" in result:
             from utils.texts import OTHER_CREATED_MESSAGE
             
-            # Create message with ONLY join button
+            # Create message with join button
             message = OTHER_CREATED_MESSAGE.format(
                 GROUP_NAME=group_name,
                 GROUP_INVITE_LINK=result["invite_url"]
             )
             
-            # Only show join button, no main menu
             join_button = [
                 [Button.url("🔗 Join Group Now", result["invite_url"])]
             ]
@@ -167,30 +198,35 @@ async def handle_create_other(event):
                 buttons=join_button
             )
             
-            # Print log to console
-            print("\n" + "="*60)
-            print(f"✅ OTHER DEAL GROUP CREATED SUCCESSFULLY")
+            # Professional console log
+            print("\n" + "═"*60)
+            print("📊 DEAL GROUP CREATION REPORT")
+            print("═"*60)
+            print(f"📅 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"👤 Created by: {mention}")
+            print(f"🆔 Creator ID: {user.id}")
             print(f"📛 Group Name: {group_name}")
-            print(f"🔗 Initial Invite: {result['invite_url']}")
+            print(f"🔗 Invite Link: {result['invite_url']}")
             print(f"🆔 Group ID: {result.get('group_id', 'N/A')}")
-            print(f"🤖 Bot Added: @{bot_username}")
-            print(f"👑 Creator Promoted: YES (Anonymous Admin)")
-            print(f"📌 Welcome Message Pinned: YES")
-            print(f"👻 History Hidden: YES (New users won't see old messages)")
-            print(f"📝 Custom Bio Set: YES")
-            print("="*60 + "\n")
+            print(f"🤖 Bot: @{bot_username}")
+            print(f"🔧 Features:")
+            print(f"   ✓ Creator promoted as Anonymous Admin")
+            print(f"   ✓ Welcome message pinned")
+            print(f"   ✓ History hidden for new users")
+            print(f"   ✓ Custom bio configured")
+            print("═"*60)
             
         else:
             await event.edit(
-                "❌ <b>Failed to create group</b>\n\n<blockquote>Please try again later</blockquote>",
+                "<b>❌ Failed to Create Group</b>\n\n<blockquote>Please try again later</blockquote>",
                 parse_mode='html',
                 buttons=[Button.inline("🔄 Try Again", b"create")]
             )
             
     except Exception as e:
-        print(f"Error in Other deal handler: {e}")
+        print(f"[ERROR] Other deal handler: {e}")
         await event.edit(
-            "❌ <b>Error creating group</b>\n\n<blockquote>Please try again</blockquote>",
+            "<b>❌ Error Creating Group</b>\n\n<blockquote>Technical issue detected</blockquote>",
             parse_mode='html',
             buttons=[Button.inline("🔄 Try Again", b"create")]
         )
@@ -200,7 +236,7 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
     Create a supergroup with hidden history and custom bio
     """
     if not STRING_SESSION1:
-        print("❌ STRING_SESSION1 not configured in .env")
+        print("[ERROR] STRING_SESSION1 not configured in .env")
         return None
     
     user_client = None
@@ -209,59 +245,69 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
         user_client = TelegramClient(StringSession(STRING_SESSION1), API_ID, API_HASH)
         await user_client.start()
         
-        print(f"✅ User client started (Creator)")
-        print(f"🔄 Creating group: {group_name}")
+        print("[INFO] User client started (Creator)")
         
         # Get bot entity
         bot_entity = await user_client.get_entity(bot_username)
-        print(f"✅ Got bot entity: @{bot_username}")
+        print(f"[INFO] Bot entity: @{bot_username}")
         
-        # Get creator's own entity
+        # Get creator's entity
         creator = await user_client.get_me()
-        print(f"✅ Creator: @{creator.username if creator.username else creator.id}")
+        creator_name = creator.username if creator.username else f"ID:{creator.id}"
+        print(f"[INFO] Creator: @{creator_name}")
         
-        # Create supergroup - EMPTY (no users added)
+        # STEP 1: Create supergroup
+        print(f"[STEP 1/6] Creating supergroup: {group_name}")
         created = await user_client(functions.channels.CreateChannelRequest(
             title=group_name,
-            about=f"Secure {group_type.upper()} Escrow Group",  # Temporary about
+            about=f"Secure {group_type.upper()} Escrow Group",
             megagroup=True,
             broadcast=False
         ))
         
-        # Get channel info
         chat = created.chats[0]
         chat_id = chat.id
         channel = types.InputPeerChannel(channel_id=chat.id, access_hash=chat.access_hash)
-        print(f"✅ Supergroup created: {chat_id}")
+        print(f"[SUCCESS] Supergroup created with ID: {chat_id}")
         
-        # 🔥 CRITICAL: HIDE PRE-HISTORY (New users won't see old system messages)
-        print("🔄 Hiding pre-history for new users...")
+        # STEP 2: Hide pre-history for new users
+        print("[STEP 2/6] Hiding pre-history for new users...")
         try:
             await user_client(functions.channels.TogglePreHistoryHiddenRequest(
                 channel=channel,
-                enabled=True  # True = Hide history for new users
+                enabled=True
             ))
-            print(f"✅ History hidden for new users (Clean premium look)")
+            print("[SUCCESS] History hidden for new users")
         except Exception as e:
-            print(f"⚠️ Could not hide history: {e}")
+            print(f"[WARNING] Could not hide history: {e}")
         
-        # 🔥 SET CUSTOM GROUP BIO (About text)
-        print("🔄 Setting custom group bio...")
+        # STEP 3: Set custom group bio (using EditTitle/EditAbout)
+        print("[STEP 3/6] Setting custom group bio...")
         try:
+            # Try different methods to set bio
+            custom_bio = f"🔐 This group is being escrowed by @{bot_username}\n\n🧑‍💼 Seller : \n🧑‍💼 Buyer  :"
+            
+            # Method 1: EditAbout (for channels/supergroups)
             await user_client(functions.channels.EditAboutRequest(
                 channel=channel,
-                about=(
-                    f"🔐 This group is being escrowed by @{bot_username}\n\n"
-                    f"🧑‍💼 Seller : \n"
-                    f"🧑‍💼 Buyer  :"
-                )
+                about=custom_bio
             ))
-            print(f"✅ Custom bio set with bot mention")
+            print("[SUCCESS] Custom bio set using EditAbout")
         except Exception as e:
-            print(f"⚠️ Could not set custom bio: {e}")
+            print(f"[WARNING] Could not set custom bio: {e}")
+            try:
+                # Method 2: Edit channel info
+                await user_client(functions.channels.EditChannelRequest(
+                    channel=channel,
+                    title=group_name,
+                    about=custom_bio
+                ))
+                print("[SUCCESS] Custom bio set using EditChannel")
+            except Exception as e2:
+                print(f"[WARNING] Alternative method failed: {e2}")
         
-        # CRITICAL: Promote creator as ANONYMOUS admin
-        print("🔄 Promoting creator as ANONYMOUS admin...")
+        # STEP 4: Promote creator as ANONYMOUS admin
+        print("[STEP 4/6] Promoting creator as anonymous admin...")
         try:
             await user_client(functions.channels.EditAdminRequest(
                 channel=channel,
@@ -275,17 +321,17 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
                     invite_users=True,
                     pin_messages=True,
                     add_admins=True,
-                    anonymous=True,  # ANONYMOUS - MOST IMPORTANT
+                    anonymous=True,
                     manage_call=True,
                     other=True
                 ),
                 rank="Owner"
             ))
-            print(f"✅ Creator promoted as ANONYMOUS admin (hidden)")
+            print("[SUCCESS] Creator promoted as anonymous admin")
         except Exception as e:
-            print(f"⚠️ Could not promote creator as anonymous: {e}")
-            # Try without anonymous flag
+            print(f"[WARNING] Anonymous admin failed: {e}")
             try:
+                # Fallback to regular admin
                 await user_client(functions.channels.EditAdminRequest(
                     channel=channel,
                     user_id=creator,
@@ -304,20 +350,17 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
                     ),
                     rank="Owner"
                 ))
-                print(f"✅ Creator promoted as regular admin")
+                print("[SUCCESS] Creator promoted as regular admin")
             except Exception as e2:
-                print(f"❌ Could not promote creator at all: {e2}")
+                print(f"[ERROR] Could not promote creator: {e2}")
         
-        # Add bot to group (NO USERS ADDED)
-        print("🔄 Adding bot to group...")
+        # STEP 5: Add and promote bot
+        print("[STEP 5/6] Adding and promoting bot...")
         await user_client(functions.channels.InviteToChannelRequest(
             channel=channel,
             users=[bot_entity]
         ))
-        print(f"✅ Bot added to group")
         
-        # Promote bot as admin (not anonymous)
-        print("🔄 Promoting bot as admin...")
         await user_client(functions.channels.EditAdminRequest(
             channel=channel,
             user_id=bot_entity,
@@ -336,20 +379,17 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
             ),
             rank="Escrow Bot"
         ))
-        print(f"✅ Bot promoted as admin")
+        print("[SUCCESS] Bot added and promoted")
         
-        # Create initial invite link
-        print("🔄 Creating initial invite link...")
+        # STEP 6: Create invite and send welcome message
+        print("[STEP 6/6] Finalizing setup...")
         invite_link = await user_client(functions.messages.ExportChatInviteRequest(
             peer=channel
         ))
         invite_url = str(invite_link.link)
-        print(f"✅ Initial invite link created")
         
-        # Send and PIN welcome message
-        print("🔄 Sending and pinning welcome message...")
+        # Send and pin welcome message
         from utils.texts import WELCOME_MESSAGE
-        
         welcome_msg = WELCOME_MESSAGE.format(bot_username=bot_username)
         sent_message = await user_client.send_message(
             channel,
@@ -357,24 +397,25 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
             parse_mode='html'
         )
         
-        # Pin the welcome message
         await user_client.pin_message(channel, sent_message, notify=False)
-        print(f"✅ Welcome message pinned")
+        print("[SUCCESS] Welcome message pinned")
         
-        # Store group data for tracking
+        # Store group data
         store_group_data(chat_id, group_name, group_type, creator.id, bot_username)
         
-        # Return result
+        print(f"[COMPLETE] Group setup finished successfully")
+        
         return {
             "group_id": chat_id,
             "invite_url": invite_url,
             "group_name": group_name,
             "creator_id": creator.id,
+            "creator_username": creator_name,
             "bot_username": bot_username
         }
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Group creation failed: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -382,7 +423,7 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client):
     finally:
         if user_client and user_client.is_connected():
             await user_client.disconnect()
-            print(f"✅ User client disconnected")
+            print("[INFO] User client disconnected")
 
 def store_group_data(group_id, group_name, group_type, creator_id, bot_username):
     """Store group data for tracking"""
@@ -394,7 +435,7 @@ def store_group_data(group_id, group_name, group_type, creator_id, bot_username)
             with open(GROUPS_FILE, 'r') as f:
                 groups = json.load(f)
         
-        # Clean group ID (remove -100 prefix for supergroups)
+        # Clean group ID
         clean_group_id = str(group_id)
         if clean_group_id.startswith('-100'):
             clean_group_id = clean_group_id[4:]
@@ -404,19 +445,20 @@ def store_group_data(group_id, group_name, group_type, creator_id, bot_username)
             "type": group_type,
             "creator_id": creator_id,
             "bot_username": bot_username,
-            "original_id": str(group_id),  # Store original for reference
-            "members": [],  # Start empty, will be filled when users join
+            "original_id": str(group_id),
+            "members": [],
             "welcome_pinned": True,
-            "history_hidden": True,  # Track that history is hidden
-            "custom_bio_set": True,  # Track custom bio
-            "session_initiated": False,  # Track if /begin has been used
-            "created_at": asyncio.get_event_loop().time()
+            "history_hidden": True,
+            "custom_bio_set": True,
+            "session_initiated": False,
+            "created_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "created_timestamp": time.time()
         }
         
         with open(GROUPS_FILE, 'w') as f:
             json.dump(groups, f, indent=2)
             
-        print(f"✅ Group data stored: {clean_group_id} ({group_name})")
+        print(f"[INFO] Group data stored: {clean_group_id}")
         
     except Exception as e:
-        print(f"Error storing group data: {e}")
+        print(f"[ERROR] Storing group data: {e}")
