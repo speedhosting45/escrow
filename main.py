@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Escrow Bot - Fixed member tracking
+Main entry point for the Escrow Bot - Fixed with proper text imports
 """
 import asyncio
 import logging
@@ -23,7 +23,14 @@ from handlers.about import handle_about
 from handlers.help import handle_help
 
 # Import utilities
-from utils.texts import START_MESSAGE
+from utils.texts import (
+    START_MESSAGE, CREATE_MESSAGE, P2P_CREATED_MESSAGE, OTHER_CREATED_MESSAGE,
+    WELCOME_MESSAGE, SESSION_INITIATED_MESSAGE, ROLE_ANNOUNCEMENT_MESSAGE,
+    BUYER_CONFIRMED_MESSAGE, SELLER_CONFIRMED_MESSAGE, 
+    ROLE_ALREADY_CHOSEN_MESSAGE, ROLE_ALREADY_TAKEN_MESSAGE,
+    WALLET_SETUP_MESSAGE, ESCROW_READY_MESSAGE, STATS_MESSAGE,
+    ABOUT_MESSAGE, HELP_MESSAGE
+)
 from utils.buttons import get_main_menu_buttons
 
 # Setup logging
@@ -46,7 +53,6 @@ def load_groups():
 
 def save_groups(groups):
     """Save active groups data"""
-    # Ensure data directory exists
     os.makedirs('data', exist_ok=True)
     with open(GROUPS_FILE, 'w') as f:
         json.dump(groups, f, indent=2)
@@ -60,7 +66,6 @@ def load_user_roles():
 
 def save_user_roles(roles):
     """Save user roles data"""
-    # Ensure data directory exists
     os.makedirs('data', exist_ok=True)
     with open(USER_ROLES_FILE, 'w') as f:
         json.dump(roles, f, indent=2)
@@ -73,7 +78,6 @@ def get_user_display(user_obj):
         name = user_obj.first_name or f"User_{user_obj.id}"
         if user_obj.last_name:
             name = f"{name} {user_obj.last_name}"
-        # Clean special characters
         name = re.sub(r'[^\w\s@#]', '', name)
         return name.strip() or f"User_{user_obj.id}"
 
@@ -130,7 +134,7 @@ class EscrowBot:
         async def begin_handler(event):
             await self.handle_begin_command(event)
         
-        # Delete Telegram system messages AND track user joins
+        # Delete system messages and track user joins
         @self.client.on(events.NewMessage)
         async def handle_all_messages(event):
             """Handle all messages: delete system messages and track user joins"""
@@ -147,25 +151,20 @@ class EscrowBot:
                 
                 # 1. DELETE DUPLICATE /BEGIN MESSAGES
                 if message_text == '/begin':
-                    # Check if session already initiated
                     groups = load_groups()
-                    
-                    # Try both ID formats
                     group_data = None
+                    
                     if clean_chat_id in groups:
                         group_data = groups[clean_chat_id]
                     elif chat_id in groups:
                         group_data = groups[chat_id]
                     else:
-                        # Try to find by group name
                         for key, data in groups.items():
                             if data.get("name") == chat.title:
                                 group_data = data
                                 break
                     
-                    # If session already initiated, DELETE the /begin message
                     if group_data and group_data.get("session_initiated", False):
-                        print(f"🗑️ Deleting duplicate /begin from {event.sender_id}")
                         await event.delete()
                         return
                 
@@ -180,28 +179,25 @@ class EscrowBot:
                 ]
                 
                 is_system_message = False
-                # Check if from Telegram or contains system patterns
                 if event.sender_id == 777000 or event.sender_id == 1087968824:
                     is_system_message = True
                 elif any(pattern in message_text.lower() for pattern in system_patterns):
                     is_system_message = True
                 
                 if is_system_message:
-                    print(f"🗑️ Deleting system message: {message_text[:50]}...")
                     await event.delete()
                     
-                    # 3. TRACK USER JOINS FROM SYSTEM MESSAGES
+                    # 3. TRACK USER JOINS
                     if "joined the group via invite link" in message_text or "was added" in message_text:
                         await self.track_user_join_from_message(message_text, chat, clean_chat_id)
                     
                     return
                 
-                # 4. Handle /begin command normally (if not deleted)
+                # 4. Handle /begin command normally
                 if message_text == '/begin':
                     await self.handle_begin_command(event)
                 
             except Exception as e:
-                # Silently ignore errors
                 pass
         
         # Handle role selection buttons
@@ -209,7 +205,6 @@ class EscrowBot:
         async def role_handler(event):
             """Handle role selection (buyer/seller)"""
             try:
-                # Get the user who clicked
                 sender = await event.get_sender()
                 if not sender:
                     await event.answer("❌ Cannot identify user", alert=True)
@@ -219,7 +214,7 @@ class EscrowBot:
                 chat = await event.get_chat()
                 chat_id = str(chat.id)
                 
-                # Clean chat ID for comparison
+                # Clean chat ID
                 if chat_id.startswith('-100'):
                     clean_chat_id = chat_id[4:]
                 else:
@@ -229,19 +224,20 @@ class EscrowBot:
                 if data.startswith('role_buyer_'):
                     role = "buyer"
                     role_name = "Buyer"
+                    role_emoji = "🧑‍💼"
                     success_alert = "🔐 Buyer Role Selected\nBuyer role confirmed."
                     group_id = data.replace('role_buyer_', '')
                 elif data.startswith('role_seller_'):
                     role = "seller"
                     role_name = "Seller"
+                    role_emoji = "🧑‍💼"
                     success_alert = "🔐 Seller Role Selected\nSeller role confirmed."
                     group_id = data.replace('role_seller_', '')
                 else:
                     return
                 
-                # Check if group_id matches (try both formats)
+                # Check group ID
                 if group_id != clean_chat_id and group_id != chat_id:
-                    # Try to find group by name
                     groups = load_groups()
                     found = False
                     for key, data in groups.items():
@@ -249,7 +245,6 @@ class EscrowBot:
                             group_id = key
                             found = True
                             break
-                    
                     if not found:
                         return
                 
@@ -260,19 +255,13 @@ class EscrowBot:
                 
                 # Check if user already selected a role
                 if str(sender.id) in roles[group_id]:
-                    await event.answer(
-                        "⛔ Role Already Chosen\nYour role has already been declared.",
-                        alert=True
-                    )
+                    await event.answer(ROLE_ALREADY_CHOSEN_MESSAGE, alert=True, parse_mode='html')
                     return
                 
-                # Check if role is already taken by someone else
+                # Check if role is already taken
                 role_taken = any(u.get("role") == role for u in roles[group_id].values())
                 if role_taken:
-                    await event.answer(
-                        "⚠️ Role Already Taken\nPlease select the remaining role.",
-                        alert=True
-                    )
+                    await event.answer(ROLE_ALREADY_TAKEN_MESSAGE, alert=True, parse_mode='html')
                     return
                 
                 # Save user's role
@@ -287,23 +276,17 @@ class EscrowBot:
                 # Send success alert
                 await event.answer(success_alert, alert=True)
                 
-                # Send role confirmation message to group
+                # Send role confirmation message using imported text
                 if role == "buyer":
-                    confirm_msg = f"""
-<b>Buyer Role Confirmed</b>
-
-<a href="tg://user?id={sender.id}">{get_user_display(sender)}</a> registered as <b>Buyer</b>.
-
-Role cannot be changed.
-"""
+                    confirm_msg = BUYER_CONFIRMED_MESSAGE.format(
+                        buyer_id=sender.id,
+                        buyer_name=get_user_display(sender)
+                    )
                 else:
-                    confirm_msg = f"""
-<b>Seller Role Confirmed</b>
-
-<a href="tg://user?id={sender.id}">{get_user_display(sender)}</a> registered as <b>Seller</b>.
-
-Role cannot be changed.
-"""
+                    confirm_msg = SELLER_CONFIRMED_MESSAGE.format(
+                        seller_id=sender.id,
+                        seller_name=get_user_display(sender)
+                    )
                 
                 await event.client.send_message(
                     chat,
@@ -317,7 +300,6 @@ Role cannot be changed.
                 buyer_count = sum(1 for u in roles[group_id].values() if u.get("role") == "buyer")
                 seller_count = sum(1 for u in roles[group_id].values() if u.get("role") == "seller")
                 
-                # When both buyer and seller have selected roles
                 if buyer_count >= 1 and seller_count >= 1:
                     await self.send_roles_confirmed(event.client, chat, group_id, roles[group_id])
                 
@@ -328,19 +310,14 @@ Role cannot be changed.
     async def track_user_join_from_message(self, message_text, chat, clean_chat_id):
         """Track user join from system message"""
         try:
-            # Load groups data
             groups = load_groups()
-            
-            # Find group data
             group_data = None
             group_key = None
             
-            # Try exact match first
             if clean_chat_id in groups:
                 group_data = groups[clean_chat_id]
                 group_key = clean_chat_id
             else:
-                # Try to find by group name
                 for key, data in groups.items():
                     if data.get("name") == chat.title:
                         group_data = data
@@ -350,34 +327,25 @@ Role cannot be changed.
             if not group_data:
                 return
             
-            # Get actual participants from Telegram
+            # Get actual participants
             try:
                 participants = await self.client.get_participants(chat)
-                
-                # Count real users (not bots, not creator)
                 real_users = []
+                
                 for participant in participants:
-                    # Skip bots
                     if participant.bot:
                         continue
-                    
-                    # Skip creator if known
                     if group_data.get("creator_id") and participant.id == group_data["creator_id"]:
                         continue
-                    
                     real_users.append(participant.id)
                 
-                # Update members list
-                group_data["members"] = list(set(real_users))  # Remove duplicates
-                
-                # Save updated data
+                group_data["members"] = list(set(real_users))
                 groups[group_key] = group_data
                 save_groups(groups)
                 
                 member_count = len(group_data["members"])
                 print(f"📊 Updated member count for {chat.title}: {member_count} real users")
                 
-                # When 2 users join, delete invite link
                 if member_count >= 2:
                     await self.delete_invite_link(self.client, chat)
                     print(f"✅ Auto-deleted invite link for {chat.title} (2+ users)")
@@ -389,13 +357,13 @@ Role cannot be changed.
             print(f"Error tracking user join: {e}")
     
     async def handle_begin_command(self, event):
-        """Handle /begin command to start escrow session - FIXED VERSION"""
+        """Handle /begin command to start escrow session"""
         try:
             chat = await event.get_chat()
             user = await event.get_sender()
             chat_id = str(chat.id)
             
-            # Clean chat ID for lookup
+            # Clean chat ID
             if chat_id.startswith('-100'):
                 clean_chat_id = chat_id[4:]
             else:
@@ -403,8 +371,6 @@ Role cannot be changed.
             
             # Load groups data
             groups = load_groups()
-            
-            # Try both ID formats
             group_data = None
             group_key = None
             
@@ -415,7 +381,6 @@ Role cannot be changed.
                 group_data = groups[chat_id]
                 group_key = chat_id
             else:
-                # Try to find by group name
                 for key, data in groups.items():
                     if data.get("name") == chat.title:
                         group_data = data
@@ -423,7 +388,6 @@ Role cannot be changed.
                         break
             
             if not group_data:
-                print(f"❌ Group {clean_chat_id} ({chat.title}) not found in groups data")
                 await event.reply("❌ Group not found in system. Wait a moment and try again.")
                 return
             
@@ -432,21 +396,16 @@ Role cannot be changed.
                 await event.reply("⚠️ Escrow session has already been initiated.")
                 return
             
-            # FIXED: Get ACTUAL participant count from Telegram API
+            # Get actual participant count
             try:
                 participants = await self.client.get_participants(chat)
-                
-                # Count real users (not bots, not creator)
                 real_users = []
+                
                 for participant in participants:
-                    # Skip bots
                     if participant.bot:
                         continue
-                    
-                    # Skip creator if known
                     if group_data.get("creator_id") and participant.id == group_data["creator_id"]:
                         continue
-                    
                     real_users.append(participant.id)
                 
                 member_count = len(real_users)
@@ -456,7 +415,7 @@ Role cannot be changed.
                     await event.reply(f"⏳ Waiting for both participants to join... (Current: {member_count}/2)")
                     return
                 
-                # Update stored members list with actual data
+                # Update stored members list
                 group_data["members"] = real_users
                 groups[group_key] = group_data
                 save_groups(groups)
@@ -469,7 +428,7 @@ Role cannot be changed.
                 
                 # Get user displays
                 user_displays = []
-                for user_id in real_users[:2]:  # First 2 users
+                for user_id in real_users[:2]:
                     try:
                         user_obj = await self.client.get_entity(user_id)
                         user_displays.append(get_user_display(user_obj))
@@ -478,24 +437,10 @@ Role cannot be changed.
                 
                 display_text = " • ".join(user_displays)
                 
-                # Format session initiation message
-                message = f"""
-<b>🔐 @{bot_username} P2P Escrow Session Initiated</b>
-
-Participants: {display_text}
-
-This escrow session is governed by verified rules.
-
-<b>Please declare your role:</b>
-
-<code>
-Buyer  → Select Buyer role
-Seller → Select Seller role
-</code>
-
-<b>Important:</b>
-Role selection is final.
-"""
+                # Use SESSION_INITIATED_MESSAGE from texts.py
+                message = SESSION_INITIATED_MESSAGE.format(
+                    participants_display=display_text
+                )
                 
                 # Create role selection buttons
                 buttons = [
@@ -544,17 +489,13 @@ Role selection is final.
             if not buyer or not seller:
                 return
             
-            # Format message
-            message = f"""
-<b>✅ Roles Confirmed</b>
-
-<blockquote>
-<b>Buyer:</b> {buyer['name']}  
-<b>Seller:</b> {seller['name']}
-</blockquote>
-
-Wallet setup will be handled in next phase.
-"""
+            # Format message using WALLET_SETUP_MESSAGE
+            message = WALLET_SETUP_MESSAGE.format(
+                buyer_name=buyer['name'],
+                seller_name=seller['name'],
+                buyer_wallet_address="[address_placeholder]",
+                seller_wallet_address="[address_placeholder]"
+            )
             
             await client.send_message(
                 chat,
@@ -596,7 +537,6 @@ Wallet setup will be handled in next phase.
             # Check config
             if not API_ID or not API_HASH or not BOT_TOKEN:
                 print("❌ Missing configuration in .env file")
-                print("Please set API_ID, API_HASH, and BOT_TOKEN")
                 sys.exit(1)
             
             # Start the client
@@ -642,12 +582,11 @@ def main():
         # Create data directory
         os.makedirs('data', exist_ok=True)
         
-        # Run the bot with proper event loop handling
+        # Run the bot
         loop = asyncio.get_event_loop()
         loop.run_until_complete(bot.run())
     except RuntimeError as e:
         if "Event loop is closed" in str(e):
-            # This is expected when stopping the bot
             print("\n👋 Bot stopped")
         else:
             print(f"\n❌ Unexpected error: {e}")
