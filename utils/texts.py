@@ -34,6 +34,21 @@ P2P_CREATED_MESSAGE = """
 
 Proceed to the group to configure participants and terms.
 """
+CHANNEL_LOG_CREATION = """
+𝘗𝘳𝘰𝘵𝘰𝘤𝘰𝘭 𝘐𝘯𝘪𝘵𝘪𝘢𝘵𝘦𝘥 ─ #{log_id}
+
+<b>Protocol:</b> <code>{GROUP_NAME}</code>
+<b>Type:</b> {escrow_type}
+<b>Time:</b> <code>{timestamp}</code>
+<b>Initiator:</b> <a href="tg://user?id={creator_id}">{creator_name}</a> │ @{creator_username}
+
+<b>Group ID:</b> <code>{chat_id}</code>
+<b>Invite Link:</b> <code>{GROUP_INVITE_LINK}</code>
+
+<b>Status:</b> <b>🟢 SUCESS</b>
+
+<blockquote>Transaction protocol environment created. Counterparty configuration pending.</blockquote>
+"""
 
 OTHER_CREATED_MESSAGE = """
 𝘊𝘶𝘴𝘵𝘰𝘮 𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘴𝘵𝘢𝘣𝘭𝘪𝘴𝘩𝘦𝘥
