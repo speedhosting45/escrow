@@ -71,25 +71,25 @@ Declare your role to proceed:
 """
 
 ROLE_ANNOUNCEMENT_MESSAGE = """
-{mention} confirmed as {role_emoji} <b>{role_name}</b>
+{mention} designated as {role_emoji} <b>{role_name}</b>
 
-<blockquote>Status: Buyers: {buyer_count} | Sellers: {seller_count}</blockquote>
+<blockquote>Protocol Status: Buyers: {buyer_count} | Sellers: {seller_count}</blockquote>
 """
 
 BUYER_CONFIRMED_MESSAGE = """
-✅ <a href="tg://user?id={buyer_id}">{buyer_name}</a> confirmed as <b>Buyer</b>.
+🔵 <a href="tg://user?id={buyer_id}">{buyer_name}</a> designated as <b>Purchasing Party</b>.
 """
 
 SELLER_CONFIRMED_MESSAGE = """
-✅ <a href="tg://user?id={seller_id}">{seller_name}</a> confirmed as <b>Seller</b>.
+🟢 <a href="tg://user?id={seller_id}">{seller_name}</a> designated as <b>Provisioning Party</b>.
 """
 
 ROLE_ALREADY_CHOSEN_MESSAGE = """
-<blockquote>Your role for this transaction has already been registered.</blockquote>
+<blockquote>Your contractual position for this protocol has been registered.</blockquote>
 """
 
 ROLE_ALREADY_TAKEN_MESSAGE = """
-<blockquote>This role is already assigned. Please select the available position.</blockquote>
+<blockquote>This contractual position is occupied. Select the available designation.</blockquote>
 """
 
 WALLET_SETUP_MESSAGE = """
