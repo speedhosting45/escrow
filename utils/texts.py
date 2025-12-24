@@ -34,20 +34,48 @@ P2P_CREATED_MESSAGE = """
 
 Proceed to the group to configure participants and terms.
 """
+# Add these to your existing texts.py
+
+INSUFFICIENT_MEMBERS_MESSAGE = """
+𝘗𝘢𝘳𝘵𝘪𝘤𝘪𝘱𝘢𝘯𝘵 𝘙𝘦𝘲𝘶𝘪𝘳𝘦𝘮𝘦𝘯𝘵
+
+<blockquote>Minimum 2 participants required to commence (Current: {current_count}/2)</blockquote>
+"""
+
+WAITING_PARTICIPANTS_MESSAGE = """
+"""
+
+SESSION_ALREADY_INITIATED_MESSAGE = """
+"""
+
+GROUP_NOT_FOUND_MESSAGE = """
+𝘌𝘯𝘷𝘪𝘳𝘰𝘯𝘮𝘦𝘯𝘵 𝘜𝘯𝘢𝘷𝘢𝘪𝘭𝘢𝘣𝘭𝘦
+
+<blockquote>Transaction group not found in system registry.</blockquote>
+"""
+
+ERROR_MESSAGE = """
+𝘚𝘺𝘴𝘵𝘦𝘮 𝘌𝘳𝘳𝘰𝘳
+
+<blockquote>An operational exception occurred. Please retry.</blockquote>
+"""
+
 CHANNEL_LOG_CREATION = """
-𝘗𝘳𝘰𝘵𝘰𝘤𝘰𝘭 𝘐𝘯𝘪𝘵𝘪𝘢𝘵𝘦𝘥 ─ #{log_id}
+𝘗𝘳𝘰𝘵𝘰𝘤𝘰𝘭 𝘐𝘯𝘪𝘵𝘪𝘢𝘵𝘪𝘰𝘯
 
-<b>Protocol:</b> <code>{GROUP_NAME}</code>
+<code>┌─────────────────────────────</code>
+<b>ID:</b> {GROUP_NAME}
 <b>Type:</b> {escrow_type}
-<b>Time:</b> <code>{timestamp}</code>
-<b>Initiator:</b> <a href="tg://user?id={creator_id}">{creator_name}</a> │ @{creator_username}
-
+<b>Time:</b> {timestamp}
+<code>├─────────────────────────────</code>
+<b>Initiator:</b> {creator_name}
+<b>TG ID:</b> <code>{creator_id}</code>
+<code>├─────────────────────────────</code>
 <b>Group ID:</b> <code>{chat_id}</code>
-<b>Invite Link:</b> <code>{GROUP_INVITE_LINK}</code>
+<b>Status:</b> Configuration
+<code>└─────────────────────────────</code>
 
-<b>Status:</b> <b>🟢 SUCESS</b>
-
-<blockquote>Transaction protocol environment created. Counterparty configuration pending.</blockquote>
+<blockquote>Transaction environment established. Counterparty configuration pending.</blockquote>
 """
 
 OTHER_CREATED_MESSAGE = """
