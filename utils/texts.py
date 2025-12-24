@@ -1,209 +1,173 @@
 # Text messages for the bot
 
 START_MESSAGE = """
-<b>🔐 Secure Escrow Bot</b>
+𝘞𝘦𝘭𝘤𝘰𝘮𝘦 𝘵𝘰 𝘚𝘦𝘤𝘶𝘳𝘦 𝘌𝘴𝘤𝘳𝘰𝘸
 
-<blockquote>
-Safe • Transparent • Trusted
-</blockquote>
+A trusted escrow solution for secure, high-value P2P transactions.
 
-Welcome! This bot helps you create secure escrow deals between buyers and sellers.
+<blockquote>Enterprise-grade security • Transparent process • Neutral third-party</blockquote>
 
-Choose an option below to continue ⬇️
+Initiate or manage secure escrow agreements through the menu below.
 """
-# Add this to your texts.py file
+
+CREATE_MESSAGE = """
+𝘊𝘳𝘦𝘢𝘵𝘦 𝘕𝘦𝘸 𝘌𝘴𝘤𝘳𝘰𝘸
+
+<blockquote>Select transaction type to proceed</blockquote>
+
+• <b>P2P Deal</b> – Standard buyer/seller transactions
+• <b>Other Deal</b> – Custom or multi-party agreements
+
+All escrows operate within private, bot-moderated groups.
+"""
+
+P2P_CREATED_MESSAGE = """
+𝘗2𝘗 𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘴𝘵𝘢𝘣𝘭𝘪𝘴𝘩𝘦𝘥
+
+<blockquote>Secure transaction group created</blockquote>
+
+<b>Group:</b> {GROUP_NAME}
+<b>Type:</b> P2P Transaction
+<b>Status:</b> Ready for configuration
+
+<code>{GROUP_INVITE_LINK}</code>
+
+Proceed to the group to configure participants and terms.
+"""
 
 OTHER_CREATED_MESSAGE = """
-<b>📦 Other Deal Escrow Created</b>
+𝘊𝘶𝘴𝘵𝘰𝘮 𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘴𝘵𝘢𝘣𝘭𝘪𝘴𝘩𝘦𝘥
 
-<blockquote>
-Your private escrow group has been created successfully
-</blockquote>
+<blockquote>Multi-party agreement group created</blockquote>
 
-• Group Name: <b>{GROUP_NAME}</b>  
-• Type: <b>Other Deal</b>  
+<b>Group:</b> {GROUP_NAME}
+<b>Type:</b> Custom Agreement
+<b>Status:</b> Ready for configuration
 
-Please continue your deal inside the group.
+<code>{GROUP_INVITE_LINK}</code>
 
-🔗 <b>Group Link:</b>  
-<a href="{GROUP_INVITE_LINK}">{GROUP_INVITE_LINK}</a>
-"""
-CREATE_MESSAGE = """
-<b>➕ Create Escrow</b>
-
-<blockquote>
-Select the type of deal you want to create
-</blockquote>
-"""
-# Add this new template to texts.py
-
-ROLE_ANNOUNCEMENT_MESSAGE = """
-{mention} declared as {role_emoji} <b>{role_name}</b>
-
-<blockquote>
-👥 Status: Buyers: {buyer_count} | Sellers: {seller_count}
-</blockquote>
+Proceed to the group to define participants and contract terms.
 """
 
-STATS_MESSAGE = """
-<b>📊 Your Stats</b>
-
-<blockquote>
-Escrow statistics will appear here soon
-</blockquote>
-
-• Total Escrows: 0  
-• Completed: 0  
-• Disputes: 0  
-• Success Rate: 0%
-"""
-P2P_CREATED_MESSAGE = """
-<b>🤝 P2P Escrow Created</b>
-
-<blockquote>
-Your private escrow group has been created successfully
-</blockquote>
-
-• Group Name: <b>P2P Escrow By @Siyorou #01</b>  
-• Type: <b>P2P Deal</b>  
-
-Please continue your deal inside the group.
-
-🔗 <b>Group Link:</b>  
-<a href="{GROUP_INVITE_LINK}">{GROUP_INVITE_LINK}</a>
-"""
-
-ABOUT_MESSAGE = """
-<b>ℹ️ About This Bot</b>
-
-<blockquote>
-A secure escrow solution built for Telegram
-</blockquote>
-
-• Supports P2P deals  
-• Transparent escrow flow  
-• Admin-controlled dispute resolution  
-
-More features coming soon 🚀
-"""
-# Welcome message that gets pinned
 WELCOME_MESSAGE = """
-🤝 <b>Welcome to P2P Escrow by @{bot_username}</b>
+𝘚𝘦𝘤𝘶𝘳𝘦 𝘌𝘴𝘤𝘳𝘰𝘸 𝘚𝘦𝘴𝘴𝘪𝘰𝘯
 
-To initiate this deal:
-<code>/begin</code>
+This group facilitates a secure escrow transaction managed by @{bot_username}.
+
+<blockquote>To begin configuration: <code>/begin</code></blockquote>
+
+All communications within this group are logged for dispute resolution.
 """
 
-# Session initiation message
-# Simplified messages
-WELCOME_MESSAGE = """
-🤝 <b>Welcome to P2P Escrow by @{bot_username}</b>
-
-<blockquote>To initiate this deal: /begin</blockquote>
-"""
-
-# Simplified session message (no extra spaces)
 SESSION_INITIATED_MESSAGE = """
-<b>🔐 @{bot_username} P2P Escrow Session Initiated</b>
+𝘚𝘦𝘴𝘴𝘪𝘰𝘯 𝘊𝘰𝘯𝘧𝘪𝘨𝘶𝘳𝘢𝘵𝘪𝘰𝘯 𝘚𝘵𝘢𝘳𝘵𝘦𝘥
 
 <b>Participants:</b> {participants_display}
 
-This escrow session is governed by verified rules.
+Declare your role to proceed:
+<code>/buyer</code> or <code>/seller</code>
 
-<b>Please declare your role:</b>
-<code>Buyer</code> or <code>Seller</code>
-
-<b>Important:</b> Role selection is final.
+<blockquote>Role selection is final and binding for this transaction.</blockquote>
 """
 
+ROLE_ANNOUNCEMENT_MESSAGE = """
+{mention} confirmed as {role_emoji} <b>{role_name}</b>
 
-# Simplified role confirmations (no "locked" word)
-BUYER_CONFIRMED_MESSAGE = "✅ <a href=\"tg://user?id={buyer_id}\">{buyer_name}</a> registered as <b>Buyer</b>."
+<blockquote>Status: Buyers: {buyer_count} | Sellers: {seller_count}</blockquote>
+"""
 
-SELLER_CONFIRMED_MESSAGE = "✅ <a href=\"tg://user?id={seller_id}\">{seller_name}</a> registered as <b>Seller</b>."
+BUYER_CONFIRMED_MESSAGE = """
+✅ <a href="tg://user?id={buyer_id}">{buyer_name}</a> confirmed as <b>Buyer</b>.
+"""
 
-# Simplified alerts
+SELLER_CONFIRMED_MESSAGE = """
+✅ <a href="tg://user?id={seller_id}">{seller_name}</a> confirmed as <b>Seller</b>.
+"""
+
 ROLE_ALREADY_CHOSEN_MESSAGE = """
-⛔ Role Already Chosen
-Your role has already been declared.
+<blockquote>Your role for this transaction has already been registered.</blockquote>
 """
 
 ROLE_ALREADY_TAKEN_MESSAGE = """
-⚠️ Role Already Taken
-Please select the remaining role.
+<blockquote>This role is already assigned. Please select the available position.</blockquote>
 """
 
-# Keep other templates as is
-
-# Wallet setup message
 WALLET_SETUP_MESSAGE = """
-<b>✅ Roles Are Confirmed</b>
+𝘗𝘢𝘳𝘵𝘪𝘤𝘪𝘱𝘢𝘯𝘵𝘴 𝘊𝘰𝘯𝘧𝘪𝘳𝘮𝘦𝘥
 
 <blockquote>
-<b>Buyer:</b> {buyer_name}  
+<b>Buyer:</b> {buyer_name}
 <b>Seller:</b> {seller_name}
 </blockquote>
 
-<b>Please set your wallets to continue:</b>
+Provide settlement addresses:
 
-<code>
-Buyer  : /buyer {{buyer_wallet_address}}
-Seller : /seller {{seller_wallet_address}}
-</code>
+<code>/buyer {buyer_wallet_address}</code>
+<code>/seller {seller_wallet_address}</code>
 
-<blockquote>
-⚠️ Make sure the wallet addresses are correct.
-Once submitted, they <b>cannot be changed</b>.
-</blockquote>
+<blockquote>Addresses cannot be modified once submitted. Verify carefully before submission.</blockquote>
 """
 
-# Escrow ready message
 ESCROW_READY_MESSAGE = """
-🎉 <b>ESCROW READY TO START!</b> 🎉
+𝘌𝘴𝘤𝘳𝘰𝘸 𝘊𝘰𝘯𝘵𝘳𝘢𝘤𝘵 𝘙𝘦𝘢𝘥𝘺
 
-<blockquote>
-✅ <b>All Requirements Met</b> ✅
-</blockquote>
+<blockquote>All prerequisites satisfied • Transaction ready to execute</blockquote>
 
-════════════════════════════════════
+<b>Participants</b>
+• Buyer: {buyer_name}
+• Seller: {seller_name}
 
-<b>👤 PARTICIPANTS:</b>
-🛒 <b>Buyer:</b> {buyer_name}
-💰 <b>Seller:</b> {seller_name}
+<b>Settlement Addresses</b>
+• Buyer: <code>{buyer_wallet}</code>
+• Seller: <code>{seller_wallet}</code>
 
-════════════════════════════════════
+<b>Standard Execution Flow</b>
+1. Buyer deposits agreed amount to escrow
+2. Seller fulfills obligation
+3. Buyer confirms satisfactory completion
+4. Escrow releases funds to seller
 
-<b>🔗 WALLET ADDRESSES:</b>
-• <b>Buyer Wallet:</b> <code>{buyer_wallet}</code>
-• <b>Seller Wallet:</b> <code>{seller_wallet}</code>
+<blockquote>All transaction communications must remain within this group for security and audit purposes.</blockquote>
 
-════════════════════════════════════
+𝘚𝘦𝘤𝘶𝘳𝘦 𝘛𝘳𝘢𝘯𝘴𝘢𝘤𝘵𝘪𝘰𝘯 𝘈𝘤𝘵𝘪𝘷𝘦
+"""
 
-<b>📝 NEXT STEPS:</b>
-1. Buyer sends funds to escrow
-2. Seller confirms item/service delivery
-3. Buyer confirms receipt
-4. Funds released to seller
+STATS_MESSAGE = """
+𝘗𝘦𝘳𝘧𝘰𝘳𝘮𝘢𝘯𝘤𝘦 𝘔𝘦𝘵𝘳𝘪𝘤𝘴
 
-<blockquote>
-⚠️ <b>IMPORTANT:</b> All communications and transactions should happen in this group for transparency and security.
-</blockquote>
+<blockquote>Transaction history and reliability indicators</blockquote>
 
-🔒 <b>SECURE ESCROW ACTIVE</b>
+• Total Escrows: 0
+• Successfully Completed: 0
+• Dispute Resolutions: 0
+• Completion Rate: 0%
+
+Statistics update upon transaction completion.
+"""
+
+ABOUT_MESSAGE = """
+𝘗𝘭𝘢𝘵𝘧𝘰𝘳𝘮 𝘖𝘷𝘦𝘳𝘷𝘪𝘦𝘸
+
+<blockquote>A neutral escrow solution for secure digital transactions</blockquote>
+
+• P2P and multi-party transaction support
+• Transparent, auditable process flow
+• Admin-mediated dispute resolution
+• Secure communication and documentation
+
+Designed for high-value transactions requiring trusted intermediation.
 """
 
 HELP_MESSAGE = """
-<b>❓ Help & Support</b>
+𝘖𝘱𝘦𝘳𝘢𝘵𝘪𝘰𝘯𝘢𝘭 𝘗𝘳𝘰𝘵𝘰𝘤𝘰𝘭
 
-<blockquote>
-How this escrow bot works
-</blockquote>
+<blockquote>Standard escrow execution process</blockquote>
 
-1️⃣ Buyer creates escrow  
-2️⃣ Funds are secured  
-3️⃣ Seller delivers  
-4️⃣ Buyer confirms  
-5️⃣ Funds released safely  
+1. Contract Creation – Terms and participants established
+2. Role Assignment – Buyer and seller identities confirmed
+3. Wallet Configuration – Settlement addresses registered
+4. Fund Deposit – Buyer secures payment in escrow
+5. Obligation Fulfillment – Seller delivers as agreed
+6. Confirmation & Release – Buyer verifies, funds released
 
-Need help? Contact admin.
-"""
+<blockquote>For protocol clarification or dispute assistance, contact designated administrators.</blockquote>
