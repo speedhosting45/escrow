@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create escrow handlers - Simplified version with channel logging
+Create escrow handlers - Version with images and captions
 """
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
@@ -16,6 +16,10 @@ import time
 
 # Channel ID for logging
 LOG_CHANNEL_ID = -1003631543074
+
+# Image URLs from config
+OTC_IMAGE = "https://files.catbox.moe/f6lzpr.png"
+P2P_IMAGE = "https://files.catbox.moe/ieiejo.png"
 
 # Define get_next_number locally
 def get_next_number(group_type="p2p"):
@@ -58,7 +62,7 @@ async def handle_create(event):
 
 async def handle_create_p2p(event):
     """
-    Handle P2P deal selection with animation
+    Handle P2P deal selection with animation and image
     """
     try:
         # Get user mention
@@ -69,11 +73,11 @@ async def handle_create_p2p(event):
         
         # Create animation sequence
         animation_messages = [
-            f"<b>🔐 Creating Group</b>\n\n<blockquote>Creating group please wait {mention}.</blockquote>",
-            f"<b>🔐 Creating Group</b>\n\n<blockquote>Creating group please wait {mention}..</blockquote>",
-            f"<b>🔐 Creating Group</b>\n\n<blockquote>Creating group please wait {mention}...</blockquote>",
-            f"<b>✅ Group Created Successfully</b>\n\n<blockquote>Setting up escrow features...</blockquote>"
-        ]
+       f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘚𝘦𝘤𝘶𝘳𝘦 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Establishing transaction environment. {mention}</blockquote>",
+       f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘚𝘦𝘤𝘶𝘳𝘦 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Configuring secure channel.. {mention}</blockquote>",
+       f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘚𝘦𝘤𝘶𝘳𝘦 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Finalizing security protocols... {mention}</blockquote>",
+       f"𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘯𝘷𝘪𝘳𝘰𝘯𝘮𝘦𝘯𝘵 𝘙𝘦𝘢𝘥𝘺\n\n<blockquote>Secure transaction channel established</blockquote>"
+    ]
         
         # Show animation
         for msg in animation_messages:
@@ -95,8 +99,8 @@ async def handle_create_p2p(event):
         if result and "invite_url" in result:
             from utils.texts import P2P_CREATED_MESSAGE
             
-            # Create message with join button
-            message = P2P_CREATED_MESSAGE.format(
+            # Create caption with join button
+            caption = P2P_CREATED_MESSAGE.format(
                 GROUP_NAME=group_name,
                 GROUP_INVITE_LINK=result["invite_url"]
             )
@@ -105,16 +109,29 @@ async def handle_create_p2p(event):
                 [Button.url("🔗 Join Group Now", result["invite_url"])]
             ]
             
-            await event.edit(
-                message,
-                parse_mode='html',
-                link_preview=False,
-                buttons=join_button
-            )
+            # Send image with caption
+            try:
+                await event.delete()  # Delete the animation message
+                await event.client.send_file(
+                    event.chat_id,
+                    P2P_IMAGE,
+                    caption=caption,
+                    parse_mode='html',
+                    buttons=join_button,
+                    link_preview=False
+                )
+            except:
+                # Fallback to text message if image fails
+                await event.edit(
+                    caption,
+                    parse_mode='html',
+                    link_preview=False,
+                    buttons=join_button
+                )
             
         else:
             await event.edit(
-                "<b>❌ Failed to Create Group</b>\n\n<blockquote>Please try again later</blockquote>",
+                "<b>❌ Failed to Create P2P Escrow</b>\n\n<blockquote>Please try again later</blockquote>",
                 parse_mode='html',
                 buttons=[Button.inline("🔄 Try Again", b"create")]
             )
@@ -122,14 +139,14 @@ async def handle_create_p2p(event):
     except Exception as e:
         print(f"[ERROR] P2P handler: {e}")
         await event.edit(
-            "<b>❌ Error Creating Group</b>\n\n<blockquote>Technical issue detected</blockquote>",
+            "<b>❌ Error Creating P2P Escrow</b>\n\n<blockquote>Technical issue detected</blockquote>",
             parse_mode='html',
             buttons=[Button.inline("🔄 Try Again", b"create")]
         )
 
 async def handle_create_other(event):
     """
-    Handle Other deal selection with animation
+    Handle OTC deal selection with animation and image
     """
     try:
         # Get user mention
@@ -140,11 +157,11 @@ async def handle_create_other(event):
         
         # Create animation sequence
         animation_messages = [
-            f"<b>🔐 Creating Deal Group</b>\n\n<blockquote>Creating group please wait {mention}.</blockquote>",
-            f"<b>🔐 Creating Deal Group</b>\n\n<blockquote>Creating group please wait {mention}..</blockquote>",
-            f"<b>🔐 Creating Deal Group</b>\n\n<blockquote>Creating group please wait {mention}...</blockquote>",
-            f"<b>✅ Group Created Successfully</b>\n\n<blockquote>Setting up escrow features...</blockquote>"
-        ]
+          f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘖𝘛𝘊 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Initializing secure environment. {mention}</blockquote>",
+          f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘖𝘛𝘊 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Configuring transaction parameters.. {mention}</blockquote>",
+          f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘖𝘛𝘊 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Finalizing security protocols... {mention}</blockquote>",
+          f"𝘖𝘛𝘊 𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘴𝘵𝘢𝘣𝘭𝘪𝘴𝘩𝘦𝘥\n\n<blockquote>Secure OTC channel ready</blockquote>"
+   ]
         
         # Show animation
         for msg in animation_messages:
@@ -166,8 +183,8 @@ async def handle_create_other(event):
         if result and "invite_url" in result:
             from utils.texts import OTHER_CREATED_MESSAGE
             
-            # Create message with join button
-            message = OTHER_CREATED_MESSAGE.format(
+            # Create caption with join button
+            caption = OTHER_CREATED_MESSAGE.format(
                 GROUP_NAME=group_name,
                 GROUP_INVITE_LINK=result["invite_url"]
             )
@@ -176,24 +193,37 @@ async def handle_create_other(event):
                 [Button.url("🔗 Join Group Now", result["invite_url"])]
             ]
             
-            await event.edit(
-                message,
-                parse_mode='html',
-                link_preview=False,
-                buttons=join_button
-            )
+            # Send image with caption
+            try:
+                await event.delete()  # Delete the animation message
+                await event.client.send_file(
+                    event.chat_id,
+                    OTC_IMAGE,
+                    caption=caption,
+                    parse_mode='html',
+                    buttons=join_button,
+                    link_preview=False
+                )
+            except:
+                # Fallback to text message if image fails
+                await event.edit(
+                    caption,
+                    parse_mode='html',
+                    link_preview=False,
+                    buttons=join_button
+                )
             
         else:
             await event.edit(
-                "<b>❌ Failed to Create Group</b>\n\n<blockquote>Please try again later</blockquote>",
+                "<b>❌ Failed to Create OTC Escrow</b>\n\n<blockquote>Please try again later</blockquote>",
                 parse_mode='html',
                 buttons=[Button.inline("🔄 Try Again", b"create")]
             )
             
     except Exception as e:
-        print(f"[ERROR] Other deal handler: {e}")
+        print(f"[ERROR] OTC handler: {e}")
         await event.edit(
-            "<b>❌ Error Creating Group</b>\n\n<blockquote>Technical issue detected</blockquote>",
+            "<b>❌ Error Creating OTC Escrow</b>\n\n<blockquote>Technical issue detected</blockquote>",
             parse_mode='html',
             buttons=[Button.inline("🔄 Try Again", b"create")]
         )
@@ -228,11 +258,11 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client, 
         creator_name = creator.username if creator.username else f"ID:{creator.id}"
         print(f"[INFO] Creator: @{creator_name}")
         
-        # STEP 1: Create supergroup (visible chat)
+        # STEP 1: Create supergroup
         print("[STEP 1/5] Creating supergroup...")
         created = await user_client(functions.channels.CreateChannelRequest(
             title=group_name,
-            about=f"🔐 Secure {group_type.upper()} Escrow Group\n\nEscrowed by @{bot_username}",
+            about=f"🔐 Secure {group_type.upper()} Escrow Group\nEscrowed by @{bot_username}",
             megagroup=True,
             broadcast=False
         ))
@@ -257,7 +287,7 @@ async def create_escrow_group(group_name, bot_username, group_type, bot_client, 
                     invite_users=True,
                     pin_messages=True,
                     add_admins=True,
-                    anonymous=True,  # CRITICAL: Anonymous admin
+                    anonymous=True,
                     manage_call=True,
                     other=True
                 ),
@@ -353,12 +383,11 @@ async def send_log_to_channel(user_client, group_name, group_type, creator, chat
     try:
         from utils.texts import CHANNEL_LOG_CREATION
         
-        # Generate log ID (timestamp based)
+        # Generate log ID
         import random
         log_id = f"{int(time.time())}{random.randint(1000, 9999)}"
         
         # Format timestamp
-        from datetime import datetime
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
         
         # Get creator display name
@@ -375,7 +404,7 @@ async def send_log_to_channel(user_client, group_name, group_type, creator, chat
             GROUP_NAME=group_name,
             escrow_type=escrow_type,
             timestamp=timestamp,
-            creator_id=creator_user_id,  # From bot client
+            creator_id=creator_user_id,
             creator_name=creator_display,
             creator_username=creator.username if creator.username else "N/A",
             chat_id=chat_id,
@@ -383,16 +412,30 @@ async def send_log_to_channel(user_client, group_name, group_type, creator, chat
         )
         
         # Send to log channel
-        await user_client.send_message(
-            LOG_CHANNEL_ID,
-            log_message,
-            parse_mode='html'
-        )
-        
-        print(f"[LOG] Creation log sent to channel: {LOG_CHANNEL_ID}")
+        try:
+            # Try to send to channel
+            await user_client.send_message(
+                LOG_CHANNEL_ID,
+                log_message,
+                parse_mode='html'
+            )
+            print(f"[LOG] Creation log sent to channel")
+        except Exception as e:
+            print(f"[WARNING] Could not send log to channel: {e}")
+            # Try with entity
+            try:
+                channel_entity = await user_client.get_entity(LOG_CHANNEL_ID)
+                await user_client.send_message(
+                    channel_entity,
+                    log_message,
+                    parse_mode='html'
+                )
+                print(f"[LOG] Creation log sent via entity")
+            except Exception as e2:
+                print(f"[ERROR] Failed to send log: {e2}")
         
     except Exception as e:
-        print(f"[ERROR] Sending log to channel: {e}")
+        print(f"[ERROR] Preparing log message: {e}")
 
 def store_group_data(group_id, group_name, group_type, creator_id, bot_username, creator_username, creator_user_id):
     """Store group data for tracking"""
