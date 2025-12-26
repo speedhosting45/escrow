@@ -2,17 +2,22 @@
 """
 Create escrow handlers - With proper imports and KeyboardButtonCopy
 """
+"""
+Create escrow handlers – proper imports (Telethon compatible)
+"""
+
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
-from telethon import Button
-from telethon.tl.types import ChatAdminRights, KeyboardButtonCopy
+from telethon.tl.types import ChatAdminRights
+from telethon import TelegramClient, Button
+
 from config import STRING_SESSION1, API_ID, API_HASH, set_bot_username
-from telethon import TelegramClient
+
 import asyncio
 import json
 import os
-from datetime import datetime
 import time
+from datetime import datetime
 
 # Channel ID for logging
 LOG_CHANNEL_ID = -1003631543074
