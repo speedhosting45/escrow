@@ -43,48 +43,40 @@ def get_back_button():
     ]
 
 
-# ======================================================
-# ESCROW CREATED BUTTONS (P2P / OTC)
-# ======================================================
-
 def get_p2p_created_buttons(invite_url):
-    """
-    Buttons shown after P2P escrow group creation
-    """
+    """Get buttons for P2P created message"""
+    # Create KeyboardButtonCopy for copy functionality
+    copy_button = KeyboardButtonCopy(
+        text="📋 Copy Link",
+        copy_text=invite_url
+    )
+    
     return [
         [
             Button.url("🔗 Join Now", invite_url),
             Button.url("📤 Share", f"https://t.me/share/url?url={invite_url}")
         ],
-        [
-            Button.inline("📋 Copy Link", b"copy_invite_link")
-        ]
+        [copy_button]  # This is the actual copy button
     ]
-
 
 def get_otc_created_buttons(invite_url):
-    """
-    Buttons shown after OTC escrow group creation
-    """
+    """Get buttons for OTC created message"""
+    # Create KeyboardButtonCopy for copy functionality
+    copy_button = KeyboardButtonCopy(
+        text="📋 Copy Link",
+        copy_text=invite_url
+    )
+    
     return [
         [
             Button.url("🔗 Join Now", invite_url),
             Button.url("📤 Share", f"https://t.me/share/url?url={invite_url}")
         ],
-        [
-            Button.inline("📋 Copy Link", b"copy_invite_link")
-        ]
+        [copy_button]  # This is the actual copy button
     ]
 
-
-# ======================================================
-# ROLE SELECTION BUTTONS
-# ======================================================
-
 def get_session_buttons(group_key):
-    """
-    Buyer / Seller role selection buttons
-    """
+    """Get buttons for session initiation"""
     return [
         [
             Button.inline("🧑‍💼 Buyer", f"role_buyer_{group_key}".encode()),
