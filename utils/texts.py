@@ -76,7 +76,7 @@ CHANNEL_LOG_CREATION = """
 𝘗𝘳𝘰𝘵𝘰𝘤𝘰𝘭 𝘐𝘯𝘪𝘵𝘪𝘢𝘵𝘪𝘰𝘯
 
 <code>┌─────────────────────────────</code>
-<b>ID:</b> {GROUP_NAME}
+<b>ID:</b> {group_name}
 <b>Type:</b> {escrow_type}
 <b>Time:</b> {timestamp}
 <code>├─────────────────────────────</code>
