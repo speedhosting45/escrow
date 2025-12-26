@@ -18,8 +18,8 @@ BOT_USERNAME = ""
 # Add these to your config.py file
 
 # Image URLs
-OTC_IMAGE = "https://files.catbox.moe/f6lzpr.png"
-P2P_IMAGE = "https://files.catbox.moe/ieiejo.png"
+OTC_IMAGE = ""
+P2P_IMAGE = ""
 
 # Ensure data directory exists
 os.makedirs('data', exist_ok=True)
