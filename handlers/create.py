@@ -77,11 +77,20 @@ async def handle_create_p2p(event):
         group_number = get_next_number("p2p")
         group_name = f"𝖯2𝖯 𝘌𝘴𝘤𝘳𝘰𝘸 𝘚𝘦𝘴𝘴𝘪𝘰𝘯 • #{group_number:02d}"
         
-        # Show initial message
-        await event.edit(
-            f"<b>🔐 Creating P2P Escrow</b>\n\n<blockquote>Please wait {mention}...</blockquote>",
-            parse_mode='html'
-        )
+        # Show animation messages
+        animation_messages = [
+            f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘗2𝘗 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Please wait {mention}.</blockquote>",
+            f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘗2𝘗 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Please wait {mention}..</blockquote>",
+            f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘗2𝘗 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Please wait {mention}...</blockquote>",
+        ]
+        
+        # Display animation
+        for msg in animation_messages:
+            await event.edit(
+                msg,
+                parse_mode='html'
+            )
+            await asyncio.sleep(0.5)
         
         # Create group
         result = await create_escrow_group(group_name, bot_username, "p2p", event.client, user.id)
@@ -93,11 +102,12 @@ async def handle_create_p2p(event):
             # Get buttons
             buttons = get_p2p_created_buttons(result["invite_url"])
             
-            # Create message - FIXED: Use correct placeholder names
+            # Create message
             message = P2P_CREATED_MESSAGE.format(
-                group_number=group_number,
-                group_invite_link=result["invite_url"],
-                p2p_image=P2P_IMAGE
+                GROUP_NUMBER=group_number,
+                GROUP_INVITE_LINK=result["invite_url"],
+                GROUP_NAME=group_name,
+                P2P_IMAGE=P2P_IMAGE
             )
             
             # Send final message
@@ -112,15 +122,17 @@ async def handle_create_p2p(event):
             
         else:
             await event.edit(
-                "<b>❌ Failed to Create P2P Escrow</b>\n\n<blockquote>Please try again later</blockquote>",
+                "𝘌𝘴𝘤𝘳𝘰𝘸 𝘊𝘳𝘦𝘢𝘵𝘪𝘰𝘯 𝘍𝘢𝘪𝘭𝘦𝘥\n\n<blockquote>Please try again later</blockquote>",
                 parse_mode='html',
                 buttons=[Button.inline("🔄 Try Again", b"create")]
             )
             
     except Exception as e:
         print(f"[ERROR] P2P handler: {e}")
+        import traceback
+        traceback.print_exc()
         await event.edit(
-            "<b>❌ Error Creating P2P Escrow</b>\n\n<blockquote>Technical issue detected</blockquote>",
+            "𝘌𝘳𝘳𝘰𝘳 𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Technical issue detected</blockquote>",
             parse_mode='html',
             buttons=[Button.inline("🔄 Try Again", b"create")]
         )
@@ -145,11 +157,20 @@ async def handle_create_other(event):
         group_number = get_next_number("other")
         group_name = f"𝖮𝖳𝖢 𝘌𝘴𝘤𝘳𝘰𝘸 𝘚𝘦𝘴𝘴𝘪𝘰𝘯 • #{group_number:02d}"
         
-        # Show initial message
-        await event.edit(
-            f"<b>🔐 Creating OTC Escrow</b>\n\n<blockquote>Please wait {mention}...</blockquote>",
-            parse_mode='html'
-        )
+        # Show animation messages
+        animation_messages = [
+            f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘖𝘛𝘊 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Please wait {mention}.</blockquote>",
+            f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘖𝘛𝘊 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Please wait {mention}..</blockquote>",
+            f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘖𝘛𝘊 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Please wait {mention}...</blockquote>",
+        ]
+        
+        # Display animation
+        for msg in animation_messages:
+            await event.edit(
+                msg,
+                parse_mode='html'
+            )
+            await asyncio.sleep(0.5)
         
         # Create group
         result = await create_escrow_group(group_name, bot_username, "other", event.client, user.id)
@@ -161,11 +182,12 @@ async def handle_create_other(event):
             # Get buttons
             buttons = get_otc_created_buttons(result["invite_url"])
             
-            # Create message - FIXED: Use correct placeholder names
+            # Create message
             message = OTHER_CREATED_MESSAGE.format(
-                group_number=group_number,
-                group_invite_link=result["invite_url"],
-                otc_image=OTC_IMAGE
+                GROUP_NUMBER=group_number,
+                GROUP_INVITE_LINK=result["invite_url"],
+                GROUP_NAME=group_name,
+                OTC_IMAGE=OTC_IMAGE
             )
             
             # Send final message
@@ -180,15 +202,17 @@ async def handle_create_other(event):
             
         else:
             await event.edit(
-                "<b>❌ Failed to Create OTC Escrow</b>\n\n<blockquote>Please try again later</blockquote>",
+                "𝘌𝘴𝘤𝘳𝘰𝘸 𝘊𝘳𝘦𝘢𝘵𝘪𝘰𝘯 𝘍𝘢𝘪𝘭𝘦𝘥\n\n<blockquote>Please try again later</blockquote>",
                 parse_mode='html',
                 buttons=[Button.inline("🔄 Try Again", b"create")]
             )
             
     except Exception as e:
         print(f"[ERROR] OTC handler: {e}")
+        import traceback
+        traceback.print_exc()
         await event.edit(
-            "<b>❌ Error Creating OTC Escrow</b>\n\n<blockquote>Technical issue detected</blockquote>",
+            "𝘌𝘳𝘳𝘰𝘳 𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Technical issue detected</blockquote>",
             parse_mode='html',
             buttons=[Button.inline("🔄 Try Again", b"create")]
         )
