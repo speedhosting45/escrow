@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Create escrow handlers - With markdown image and proper buttons
+Create escrow handlers - With proper imports and KeyboardButtonCopy
 """
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
 from telethon import Button
-from telethon.tl.types import ChatAdminRights
+from telethon.tl.types import ChatAdminRights, KeyboardButtonCopy
 from config import STRING_SESSION1, API_ID, API_HASH, set_bot_username
 from telethon import TelegramClient
 import asyncio
@@ -98,34 +98,17 @@ async def handle_create_p2p(event):
         
         if result and "invite_url" in result:
             from utils.texts import P2P_CREATED_MESSAGE
+            from utils.buttons import get_p2p_created_buttons
+            
+            # Get buttons from buttons.py
+            buttons = get_p2p_created_buttons(result["invite_url"])
             
             # Create message with markdown image link at bottom
-            message = f"""𝘗2𝘗 𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘴𝘵𝘢𝘣𝘭𝘪𝘴𝘩𝘦𝘥
-
-<blockquote>Secure transaction group created</blockquote>
-
-<b>Group:</b> 𝖯2𝖯 𝘌𝘴𝘤𝘳𝘰𝘸 𝘚𝘦𝘴𝘴𝘪𝘰𝘯 • #{group_number:02d}
-<b>Type:</b> P2P Transaction
-<b>Status:</b> Ready for configuration
-
-<code>{result["invite_url"]}</code>
-
-Proceed to the group to configure participants and terms.
-
-[​]({P2P_IMAGE})"""
-            
-            # Create buttons in the layout you specified
-            # Row 1: [Join Now] [Share Link]
-            # Row 2: [          Copy Link          ]
-            buttons = [
-                [
-                    Button.url("🔗 Join Now", result["invite_url"]),
-                    Button.url("📤 Share Link", f"https://t.me/share/url?url={result['invite_url']}")
-                ],
-                [
-                    Button.inline("📋 Copy Link", f"copy_{result['invite_url']}")
-                ]
-            ]
+            message = P2P_CREATED_MESSAGE.format(
+                GROUP_NAME=group_name,
+                GROUP_INVITE_LINK=result["invite_url"],
+                P2P_IMAGE=P2P_IMAGE
+            )
             
             # EDIT the existing message with markdown parsing
             await event.edit(
@@ -190,34 +173,17 @@ async def handle_create_other(event):
         
         if result and "invite_url" in result:
             from utils.texts import OTHER_CREATED_MESSAGE
+            from utils.buttons import get_otc_created_buttons
+            
+            # Get buttons from buttons.py
+            buttons = get_otc_created_buttons(result["invite_url"])
             
             # Create message with markdown image link at bottom
-            message = f"""𝘊𝘶𝘴𝘵𝘰𝘮 𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘴𝘵𝘢𝘣𝘭𝘪𝘴𝘩𝘦𝘥
-
-<blockquote>Multi-party agreement group created</blockquote>
-
-<b>Group:</b> 𝖮𝖳𝖢 𝘌𝘴𝘤𝘳𝘰𝘸 𝘚𝘦𝘴𝘴𝘪𝘰𝘯 • #{group_number:02d}
-<b>Type:</b> Custom Agreement
-<b>Status:</b> Ready for configuration
-
-<code>{result["invite_url"]}</code>
-
-Proceed to the group to define participants and contract terms.
-
-[​]({OTC_IMAGE})"""
-            
-            # Create buttons in the layout you specified
-            # Row 1: [Join Now] [Share Link]
-            # Row 2: [          Copy Link          ]
-            buttons = [
-                [
-                    Button.url("🔗 Join Now", result["invite_url"]),
-                    Button.url("📤 Share Link", f"https://t.me/share/url?url={result['invite_url']}")
-                ],
-                [
-                    Button.inline("📋 Copy Link", f"copy_{result['invite_url']}")
-                ]
-            ]
+            message = OTHER_CREATED_MESSAGE.format(
+                GROUP_NAME=group_name,
+                GROUP_INVITE_LINK=result["invite_url"],
+                OTC_IMAGE=OTC_IMAGE
+            )
             
             # EDIT the existing message with markdown parsing
             await event.edit(
@@ -244,7 +210,7 @@ Proceed to the group to define participants and contract terms.
             buttons=[Button.inline("🔄 Try Again", b"create")]
         )
 
-# Handle copy button callback
+# Handle copy button callback (if needed for inline buttons)
 async def handle_copy_link(event):
     """Handle copy link button click"""
     try:
@@ -255,9 +221,6 @@ async def handle_copy_link(event):
             
             # Send alert that link is copied
             await event.answer(f"📋 Link copied to clipboard!\n\n{invite_url}", alert=True)
-            
-            # You could also send the link as a message that user can copy
-            # Or use JavaScript clipboard API if in web version
             
             print(f"[COPY] User copied link: {invite_url}")
             
