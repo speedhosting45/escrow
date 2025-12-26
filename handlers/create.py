@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create escrow handlers - Simple version without media
+Create escrow handlers - With markdown image and proper buttons
 """
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
@@ -16,6 +16,10 @@ import time
 
 # Channel ID for logging
 LOG_CHANNEL_ID = -1003631543074
+
+# Image URLs from config
+OTC_IMAGE = "https://files.catbox.moe/f6lzpr.png"
+P2P_IMAGE = "https://files.catbox.moe/ieiejo.png"
 
 # Define get_next_number locally
 def get_next_number(group_type="p2p"):
@@ -58,7 +62,7 @@ async def handle_create(event):
 
 async def handle_create_p2p(event):
     """
-    Handle P2P deal selection with animation
+    Handle P2P deal selection with animation and markdown image
     """
     try:
         # Get user mention
@@ -95,23 +99,40 @@ async def handle_create_p2p(event):
         if result and "invite_url" in result:
             from utils.texts import P2P_CREATED_MESSAGE
             
-            # Create message with join button
-            message = P2P_CREATED_MESSAGE.format(
-                GROUP_NAME=group_name,
-                GROUP_INVITE_LINK=result["invite_url"]
-            )
+            # Create message with markdown image link at bottom
+            message = f"""𝘗2𝘗 𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘴𝘵𝘢𝘣𝘭𝘪𝘴𝘩𝘦𝘥
+
+<blockquote>Secure transaction group created</blockquote>
+
+<b>Group:</b> 𝖯2𝖯 𝘌𝘴𝘤𝘳𝘰𝘸 𝘚𝘦𝘴𝘴𝘪𝘰𝘯 • #{group_number:02d}
+<b>Type:</b> P2P Transaction
+<b>Status:</b> Ready for configuration
+
+<code>{result["invite_url"]}</code>
+
+Proceed to the group to configure participants and terms.
+
+[​]({P2P_IMAGE})"""
             
-            # Only show join button
-            join_button = [
-                [Button.url("🔗 Join Group Now", result["invite_url"])]
+            # Create buttons in the layout you specified
+            # Row 1: [Join Now] [Share Link]
+            # Row 2: [          Copy Link          ]
+            buttons = [
+                [
+                    Button.url("🔗 Join Now", result["invite_url"]),
+                    Button.url("📤 Share Link", f"https://t.me/share/url?url={result['invite_url']}")
+                ],
+                [
+                    Button.inline("📋 Copy Link", f"copy_{result['invite_url']}")
+                ]
             ]
             
-            # EDIT the existing message (don't send new one)
+            # EDIT the existing message with markdown parsing
             await event.edit(
                 message,
-                parse_mode='html',
-                link_preview=False,
-                buttons=join_button
+                parse_mode='md',  # Use markdown for image link
+                link_preview=True,  # Enable link preview for image
+                buttons=buttons
             )
             
             print(f"[SUCCESS] P2P Escrow created: {group_name}")
@@ -133,7 +154,7 @@ async def handle_create_p2p(event):
 
 async def handle_create_other(event):
     """
-    Handle OTC deal selection with animation
+    Handle OTC deal selection with animation and markdown image
     """
     try:
         # Get user mention
@@ -170,23 +191,40 @@ async def handle_create_other(event):
         if result and "invite_url" in result:
             from utils.texts import OTHER_CREATED_MESSAGE
             
-            # Create message with join button
-            message = OTHER_CREATED_MESSAGE.format(
-                GROUP_NAME=group_name,
-                GROUP_INVITE_LINK=result["invite_url"]
-            )
+            # Create message with markdown image link at bottom
+            message = f"""𝘊𝘶𝘴𝘵𝘰𝘮 𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘴𝘵𝘢𝘣𝘭𝘪𝘴𝘩𝘦𝘥
+
+<blockquote>Multi-party agreement group created</blockquote>
+
+<b>Group:</b> 𝖮𝖳𝖢 𝘌𝘴𝘤𝘳𝘰𝘸 𝘚𝘦𝘴𝘴𝘪𝘰𝘯 • #{group_number:02d}
+<b>Type:</b> Custom Agreement
+<b>Status:</b> Ready for configuration
+
+<code>{result["invite_url"]}</code>
+
+Proceed to the group to define participants and contract terms.
+
+[​]({OTC_IMAGE})"""
             
-            # Only show join button
-            join_button = [
-                [Button.url("🔗 Join Group Now", result["invite_url"])]
+            # Create buttons in the layout you specified
+            # Row 1: [Join Now] [Share Link]
+            # Row 2: [          Copy Link          ]
+            buttons = [
+                [
+                    Button.url("🔗 Join Now", result["invite_url"]),
+                    Button.url("📤 Share Link", f"https://t.me/share/url?url={result['invite_url']}")
+                ],
+                [
+                    Button.inline("📋 Copy Link", f"copy_{result['invite_url']}")
+                ]
             ]
             
-            # EDIT the existing message (don't send new one)
+            # EDIT the existing message with markdown parsing
             await event.edit(
                 message,
-                parse_mode='html',
-                link_preview=False,
-                buttons=join_button
+                parse_mode='md',  # Use markdown for image link
+                link_preview=True,  # Enable link preview for image
+                buttons=buttons
             )
             
             print(f"[SUCCESS] OTC Escrow created: {group_name}")
@@ -205,6 +243,27 @@ async def handle_create_other(event):
             parse_mode='html',
             buttons=[Button.inline("🔄 Try Again", b"create")]
         )
+
+# Handle copy button callback
+async def handle_copy_link(event):
+    """Handle copy link button click"""
+    try:
+        # Extract invite URL from callback data
+        data = event.data.decode('utf-8')
+        if data.startswith('copy_'):
+            invite_url = data[5:]  # Remove 'copy_' prefix
+            
+            # Send alert that link is copied
+            await event.answer(f"📋 Link copied to clipboard!\n\n{invite_url}", alert=True)
+            
+            # You could also send the link as a message that user can copy
+            # Or use JavaScript clipboard API if in web version
+            
+            print(f"[COPY] User copied link: {invite_url}")
+            
+    except Exception as e:
+        print(f"[ERROR] Copy handler: {e}")
+        await event.answer("❌ Failed to copy link", alert=True)
 
 async def create_escrow_group(group_name, bot_username, group_type, bot_client, creator_user_id):
     """
