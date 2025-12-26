@@ -15,6 +15,8 @@ STRING_SESSION1 = os.getenv('STRING_SESSION1', '')
 # Bot username (will be set dynamically)
 BOT_USERNAME = ""
 
+LOG_CHANNEL_ID=-1003631543074
+
 # Add these to your config.py file
 
 # Image URLs
