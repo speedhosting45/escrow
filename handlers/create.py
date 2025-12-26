@@ -1,23 +1,18 @@
 #!/usr/bin/env python3
 """
-Create escrow handlers - With proper imports and KeyboardButtonCopy
+Create escrow handlers - Fixed version
 """
-"""
-Create escrow handlers – proper imports (Telethon compatible)
-"""
-
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
-from telethon.tl.types import ChatAdminRights
-from telethon import TelegramClient, Button
-
+from telethon import Button
+from telethon.tl.types import ChatAdminRights, KeyboardButtonCopy
 from config import STRING_SESSION1, API_ID, API_HASH, set_bot_username
-
+from telethon import TelegramClient
 import asyncio
 import json
 import os
-import time
 from datetime import datetime
+import time
 
 # Channel ID for logging
 LOG_CHANNEL_ID = -1003631543074
@@ -67,7 +62,7 @@ async def handle_create(event):
 
 async def handle_create_p2p(event):
     """
-    Handle P2P deal selection with animation and markdown image
+    Handle P2P deal selection with animation
     """
     try:
         # Get user mention
@@ -75,19 +70,6 @@ async def handle_create_p2p(event):
         mention = user.first_name
         if user.username:
             mention = f"@{user.username}"
-        
-        # Create animation sequence
-        animation_messages = [
-            f"<b>🔐 Creating P2P Escrow</b>\n\n<blockquote>Creating group please wait {mention}.</blockquote>",
-            f"<b>🔐 Creating P2P Escrow</b>\n\n<blockquote>Creating group please wait {mention}..</blockquote>",
-            f"<b>🔐 Creating P2P Escrow</b>\n\n<blockquote>Creating group please wait {mention}...</blockquote>",
-            f"<b>✅ P2P Escrow Created</b>\n\n<blockquote>Finalizing setup...</blockquote>"
-        ]
-        
-        # Show animation
-        for msg in animation_messages:
-            await event.edit(msg, parse_mode='html')
-            await asyncio.sleep(0.8)
         
         # Get bot info
         bot = await event.client.get_me()
@@ -97,6 +79,22 @@ async def handle_create_p2p(event):
         # Get group number
         group_number = get_next_number("p2p")
         group_name = f"𝖯2𝖯 𝘌𝘴𝘤𝘳𝘰𝘸 𝘚𝘦𝘴𝘴𝘪𝘰𝘯 • #{group_number:02d}"
+        
+        # Create animation sequence
+        animation_messages = [
+            f"<b>🔐 Creating P2P Escrow</b>\n\n<blockquote>Creating group please wait {mention}.</blockquote>",
+            f"<b>🔐 Creating P2P Escrow</b>\n\n<blockquote>Creating group please wait {mention}..</blockquote>",
+            f"<b>🔐 Creating P2P Escrow</b>\n\n<blockquote>Creating group please wait {mention}...</blockquote>",
+            f"<b>✅ Finalizing P2P Escrow</b>\n\n<blockquote>Setting up security features...</blockquote>"
+        ]
+        
+        # Show animation
+        for msg in animation_messages:
+            try:
+                await event.edit(msg, parse_mode='html')
+            except:
+                pass  # Ignore "message not modified" errors
+            await asyncio.sleep(0.8)
         
         # Create group
         result = await create_escrow_group(group_name, bot_username, "p2p", event.client, user.id)
@@ -108,41 +106,67 @@ async def handle_create_p2p(event):
             # Get buttons from buttons.py
             buttons = get_p2p_created_buttons(result["invite_url"])
             
-            # Create message with HTML formatting
+            # Create message
             message = P2P_CREATED_MESSAGE.format(
                 GROUP_NUMBER=group_number,
                 GROUP_INVITE_LINK=result["invite_url"],
                 P2P_IMAGE=P2P_IMAGE
             )
             
-            # EDIT the existing message with HTML parsing
-            await event.edit(
-                message,
-                parse_mode='html',  # Use HTML parsing
-                link_preview=True,  # Enable link preview for image
-                buttons=buttons
-            )
+            # Send final message
+            try:
+                await event.edit(
+                    message,
+                    parse_mode='html',
+                    link_preview=True,
+                    buttons=buttons
+                )
+            except Exception as edit_error:
+                # If edit fails, send as new message
+                print(f"[WARNING] Edit failed, sending new message: {edit_error}")
+                await event.respond(
+                    message,
+                    parse_mode='html',
+                    link_preview=True,
+                    buttons=buttons
+                )
             
             print(f"[SUCCESS] P2P Escrow created: {group_name}")
             
         else:
-            await event.edit(
-                "<b>❌ Failed to Create P2P Escrow</b>\n\n<blockquote>Please try again later</blockquote>",
-                parse_mode='html',
-                buttons=[Button.inline("🔄 Try Again", b"create")]
-            )
+            error_msg = "<b>❌ Failed to Create P2P Escrow</b>\n\n<blockquote>Please try again later</blockquote>"
+            try:
+                await event.edit(
+                    error_msg,
+                    parse_mode='html',
+                    buttons=[Button.inline("🔄 Try Again", b"create")]
+                )
+            except:
+                await event.respond(
+                    error_msg,
+                    parse_mode='html',
+                    buttons=[Button.inline("🔄 Try Again", b"create")]
+                )
             
     except Exception as e:
         print(f"[ERROR] P2P handler: {e}")
-        await event.edit(
-            "<b>❌ Error Creating P2P Escrow</b>\n\n<blockquote>Technical issue detected</blockquote>",
-            parse_mode='html',
-            buttons=[Button.inline("🔄 Try Again", b"create")]
-        )
+        error_msg = "<b>❌ Error Creating P2P Escrow</b>\n\n<blockquote>Technical issue detected</blockquote>"
+        try:
+            await event.edit(
+                error_msg,
+                parse_mode='html',
+                buttons=[Button.inline("🔄 Try Again", b"create")]
+            )
+        except:
+            await event.respond(
+                error_msg,
+                parse_mode='html',
+                buttons=[Button.inline("🔄 Try Again", b"create")]
+            )
 
 async def handle_create_other(event):
     """
-    Handle OTC deal selection with animation and markdown image
+    Handle OTC deal selection with animation
     """
     try:
         # Get user mention
@@ -150,19 +174,6 @@ async def handle_create_other(event):
         mention = user.first_name
         if user.username:
             mention = f"@{user.username}"
-        
-        # Create animation sequence
-        animation_messages = [
-            f"<b>🔐 Creating OTC Escrow</b>\n\n<blockquote>Creating group please wait {mention}.</blockquote>",
-            f"<b>🔐 Creating OTC Escrow</b>\n\n<blockquote>Creating group please wait {mention}..</blockquote>",
-            f"<b>🔐 Creating OTC Escrow</b>\n\n<blockquote>Creating group please wait {mention}...</blockquote>",
-            f"<b>✅ OTC Escrow Created</b>\n\n<blockquote>Finalizing setup...</blockquote>"
-        ]
-        
-        # Show animation
-        for msg in animation_messages:
-            await event.edit(msg, parse_mode='html')
-            await asyncio.sleep(0.8)
         
         # Get bot info
         bot = await event.client.get_me()
@@ -172,6 +183,22 @@ async def handle_create_other(event):
         # Get group number
         group_number = get_next_number("other")
         group_name = f"𝖮𝖳𝖢 𝘌𝘴𝘤𝘳𝘰𝘸 𝘚𝘦𝘴𝘴𝘪𝘰𝘯 • #{group_number:02d}"
+        
+        # Create animation sequence
+        animation_messages = [
+            f"<b>🔐 Creating OTC Escrow</b>\n\n<blockquote>Creating group please wait {mention}.</blockquote>",
+            f"<b>🔐 Creating OTC Escrow</b>\n\n<blockquote>Creating group please wait {mention}..</blockquote>",
+            f"<b>🔐 Creating OTC Escrow</b>\n\n<blockquote>Creating group please wait {mention}...</blockquote>",
+            f"<b>✅ Finalizing OTC Escrow</b>\n\n<blockquote>Setting up security features...</blockquote>"
+        ]
+        
+        # Show animation
+        for msg in animation_messages:
+            try:
+                await event.edit(msg, parse_mode='html')
+            except:
+                pass  # Ignore "message not modified" errors
+            await asyncio.sleep(0.8)
         
         # Create group
         result = await create_escrow_group(group_name, bot_username, "other", event.client, user.id)
@@ -183,64 +210,67 @@ async def handle_create_other(event):
             # Get buttons from buttons.py
             buttons = get_otc_created_buttons(result["invite_url"])
             
-            # Create message with HTML formatting
+            # Create message
             message = OTHER_CREATED_MESSAGE.format(
                 GROUP_NUMBER=group_number,
                 GROUP_INVITE_LINK=result["invite_url"],
                 OTC_IMAGE=OTC_IMAGE
             )
             
-            # EDIT the existing message with HTML parsing
-            await event.edit(
-                message,
-                parse_mode='html',  # Use HTML parsing
-                link_preview=True,  # Enable link preview for image
-                buttons=buttons
-            )
+            # Send final message
+            try:
+                await event.edit(
+                    message,
+                    parse_mode='html',
+                    link_preview=True,
+                    buttons=buttons
+                )
+            except Exception as edit_error:
+                # If edit fails, send as new message
+                print(f"[WARNING] Edit failed, sending new message: {edit_error}")
+                await event.respond(
+                    message,
+                    parse_mode='html',
+                    link_preview=True,
+                    buttons=buttons
+                )
             
             print(f"[SUCCESS] OTC Escrow created: {group_name}")
             
         else:
-            await event.edit(
-                "<b>❌ Failed to Create OTC Escrow</b>\n\n<blockquote>Please try again later</blockquote>",
-                parse_mode='html',
-                buttons=[Button.inline("🔄 Try Again", b"create")]
-            )
+            error_msg = "<b>❌ Failed to Create OTC Escrow</b>\n\n<blockquote>Please try again later</blockquote>"
+            try:
+                await event.edit(
+                    error_msg,
+                    parse_mode='html',
+                    buttons=[Button.inline("🔄 Try Again", b"create")]
+                )
+            except:
+                await event.respond(
+                    error_msg,
+                    parse_mode='html',
+                    buttons=[Button.inline("🔄 Try Again", b"create")]
+                )
             
     except Exception as e:
         print(f"[ERROR] OTC handler: {e}")
-        await event.edit(
-            "<b>❌ Error Creating OTC Escrow</b>\n\n<blockquote>Technical issue detected</blockquote>",
-            parse_mode='html',
-            buttons=[Button.inline("🔄 Try Again", b"create")]
-        )
-
-# Handle copy button callback (if needed for inline buttons)
-async def handle_copy_link(event):
-    """Handle copy link button click"""
-    try:
-        # Extract invite URL from callback data
-        data = event.data.decode('utf-8')
-        if data.startswith('copy_'):
-            invite_url = data[5:]  # Remove 'copy_' prefix
-            
-            # Send alert that link is copied
-            await event.answer(f"📋 Link copied to clipboard!\n\n{invite_url}", alert=True)
-            
-            print(f"[COPY] User copied link: {invite_url}")
-            
-    except Exception as e:
-        print(f"[ERROR] Copy handler: {e}")
-        await event.answer("❌ Failed to copy link", alert=True)
+        error_msg = "<b>❌ Error Creating OTC Escrow</b>\n\n<blockquote>Technical issue detected</blockquote>"
+        try:
+            await event.edit(
+                error_msg,
+                parse_mode='html',
+                buttons=[Button.inline("🔄 Try Again", b"create")]
+            )
+        except:
+            await event.respond(
+                error_msg,
+                parse_mode='html',
+                buttons=[Button.inline("🔄 Try Again", b"create")]
+            )
 
 async def create_escrow_group(group_name, bot_username, group_type, bot_client, creator_user_id):
     """
-    Create a supergroup with SIMPLE steps:
-    1. Create group
-    2. Promote creator as anonymous admin
-    3. Add bot and promote as admin
-    4. Send welcome message and pin it
-    5. Log to channel
+    Create a supergroup with SIMPLE steps
     """
     if not STRING_SESSION1:
         print("[ERROR] STRING_SESSION1 not configured in .env")
@@ -416,25 +446,28 @@ async def send_log_to_channel(user_client, group_name, group_type, creator, chat
             GROUP_INVITE_LINK=invite_url
         )
         
-        # Send to log channel
+        # Send to log channel - FIXED: Get entity first
         try:
+            # Get the channel entity
+            channel_entity = await user_client.get_input_entity(LOG_CHANNEL_ID)
             await user_client.send_message(
-                LOG_CHANNEL_ID,
+                channel_entity,
                 log_message,
                 parse_mode='html'
             )
             print(f"[LOG] Creation log sent to channel")
         except Exception as e:
             print(f"[WARNING] Could not send log to channel: {e}")
-            # Try with entity
+            # Alternative: Join the channel first
             try:
-                channel_entity = await user_client.get_entity(LOG_CHANNEL_ID)
+                # Try to access the channel
+                entity = await user_client.get_entity(LOG_CHANNEL_ID)
                 await user_client.send_message(
-                    channel_entity,
+                    entity,
                     log_message,
                     parse_mode='html'
                 )
-                print(f"[LOG] Creation log sent via entity")
+                print(f"[LOG] Creation log sent (alternative)")
             except Exception as e2:
                 print(f"[ERROR] Failed to send log: {e2}")
         
