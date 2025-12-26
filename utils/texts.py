@@ -21,18 +21,18 @@ CREATE_MESSAGE = """
 All escrows operate within private, bot-moderated groups.
 """
 
-P2P_CREATED_MESSAGE = """
-𝘗2𝘗 𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘴𝘵𝘢𝘣𝘭𝘪𝘴𝘩𝘦𝘥
+OTHER_CREATED_MESSAGE = """
+𝘊𝘶𝘴𝘵𝘰𝘮 𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘴𝘵𝘢𝘣𝘭𝘪𝘴𝘩𝘦𝘥
 
-<blockquote>Secure transaction group created</blockquote>
+<blockquote>Multi-party agreement group created</blockquote>
 
 <b>Group:</b> {GROUP_NAME}
-<b>Type:</b> P2P Transaction
+<b>Type:</b> Custom Agreement
 <b>Status:</b> Ready for configuration
 
 <code>{GROUP_INVITE_LINK}</code>
 
-Proceed to the group to configure participants and terms.
+Proceed to the group to define participants and contract terms <a href="https://files.catbox.moe/f6lzpr.png">.</a>
 """
 # Add these to your existing texts.py
 
@@ -78,18 +78,18 @@ CHANNEL_LOG_CREATION = """
 <blockquote>Transaction environment established. Counterparty configuration pending.</blockquote>
 """
 
-OTHER_CREATED_MESSAGE = """
-𝘊𝘶𝘴𝘵𝘰𝘮 𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘴𝘵𝘢𝘣𝘭𝘪𝘴𝘩𝘦𝘥
+P2P_CREATED_MESSAGE = """
+𝘗2𝘗 𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘴𝘵𝘢𝘣𝘭𝘪𝘴𝘩𝘦𝘥
 
-<blockquote>Multi-party agreement group created</blockquote>
+<blockquote>Secure transaction group created</blockquote>
 
 <b>Group:</b> {GROUP_NAME}
-<b>Type:</b> Custom Agreement
+<b>Type:</b> P2P Transaction
 <b>Status:</b> Ready for configuration
 
 <code>{GROUP_INVITE_LINK}</code>
 
-Proceed to the group to define participants and contract terms.
+Proceed to the group to configure participants and terms <a href="https://files.catbox.moe/ieiejo.png">.</a>
 """
 
 WELCOME_MESSAGE = """
