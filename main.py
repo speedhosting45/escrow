@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Escrow Bot - Simple and clean
+Main entry point for the Escrow Bot - With copy button support
 """
 import asyncio
 import logging
@@ -16,7 +16,7 @@ from config import API_ID, API_HASH, BOT_TOKEN, BOT_USERNAME
 
 # Import handlers
 from handlers.start import handle_start
-from handlers.create import handle_create, handle_create_p2p, handle_create_other
+from handlers.create import handle_create, handle_create_p2p, handle_create_other, handle_copy_link
 from handlers.stats import handle_stats
 from handlers.about import handle_about
 from handlers.help import handle_help
@@ -124,6 +124,11 @@ class EscrowBot:
                 )
             except Exception as e:
                 await event.answer("❌ An error occurred.", alert=True)
+        
+        # Handle copy button
+        @self.client.on(events.CallbackQuery(pattern=rb'copy_'))
+        async def copy_handler(event):
+            await handle_copy_link(event)
         
         # Handle /begin command
         @self.client.on(events.NewMessage(pattern='/begin'))
@@ -452,8 +457,9 @@ class EscrowBot:
             
             print("\n🚀 FEATURES:")
             print("   • P2P & OTC Escrow Creation")
-            print("   • Simple interface")
-            print("   • Role selection")
+            print("   • Markdown images in messages")
+            print("   • Copy link button")
+            print("   • Role selection system")
             print("   • Channel logging")
             print("\n📡 Bot is ready...")
             print("   Ctrl+C to stop\n")
