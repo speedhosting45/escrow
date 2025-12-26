@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Escrow Bot - With copy button support
+Main entry point for the Escrow Bot - With proper imports
 """
 import asyncio
 import logging
 import sys
-from telethon import TelegramClient, events, Button
+from telethon import TelegramClient, events
 import json
 import os
 import time
@@ -16,7 +16,7 @@ from config import API_ID, API_HASH, BOT_TOKEN, BOT_USERNAME
 
 # Import handlers
 from handlers.start import handle_start
-from handlers.create import handle_create, handle_create_p2p, handle_create_other, handle_copy_link
+from handlers.create import handle_create, handle_create_p2p, handle_create_other
 from handlers.stats import handle_stats
 from handlers.about import handle_about
 from handlers.help import handle_help
@@ -27,7 +27,7 @@ from utils.texts import (
     WELCOME_MESSAGE, SESSION_INITIATED_MESSAGE, INSUFFICIENT_MEMBERS_MESSAGE,
     SESSION_ALREADY_INITIATED_MESSAGE, GROUP_NOT_FOUND_MESSAGE
 )
-from utils.buttons import get_main_menu_buttons
+from utils.buttons import get_main_menu_buttons, get_session_buttons
 
 # Setup logging
 logging.basicConfig(
@@ -35,7 +35,6 @@ logging.basicConfig(
     level=logging.INFO,
     datefmt='%H:%M:%S'
 )
-logger = logging.getLogger(__name__)
 
 # Track groups for invite management
 GROUPS_FILE = 'data/active_groups.json'
@@ -124,11 +123,6 @@ class EscrowBot:
                 )
             except Exception as e:
                 await event.answer("❌ An error occurred.", alert=True)
-        
-        # Handle copy button
-        @self.client.on(events.CallbackQuery(pattern=rb'copy_'))
-        async def copy_handler(event):
-            await handle_copy_link(event)
         
         # Handle /begin command
         @self.client.on(events.NewMessage(pattern='/begin'))
@@ -262,13 +256,8 @@ class EscrowBot:
                     participants_display=display_text
                 )
                 
-                # Create buttons
-                buttons = [
-                    [
-                        Button.inline("🧑‍💼 Buyer", f"role_buyer_{group_key}".encode()),
-                        Button.inline("🧑‍💼 Seller", f"role_seller_{group_key}".encode())
-                    ]
-                ]
+                # Get buttons from buttons.py
+                buttons = get_session_buttons(group_key)
                 
                 # Send message
                 sent_message = await self.client.send_message(
@@ -458,7 +447,7 @@ class EscrowBot:
             print("\n🚀 FEATURES:")
             print("   • P2P & OTC Escrow Creation")
             print("   • Markdown images in messages")
-            print("   • Copy link button")
+            print("   • KeyboardButtonCopy for copy functionality")
             print("   • Role selection system")
             print("   • Channel logging")
             print("\n📡 Bot is ready...")
