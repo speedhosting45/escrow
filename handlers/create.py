@@ -108,17 +108,17 @@ async def handle_create_p2p(event):
             # Get buttons from buttons.py
             buttons = get_p2p_created_buttons(result["invite_url"])
             
-            # Create message with markdown image link at bottom
+            # Create message with HTML formatting
             message = P2P_CREATED_MESSAGE.format(
-                GROUP_NAME=group_name,
+                GROUP_NUMBER=group_number,
                 GROUP_INVITE_LINK=result["invite_url"],
                 P2P_IMAGE=P2P_IMAGE
             )
             
-            # EDIT the existing message with markdown parsing
+            # EDIT the existing message with HTML parsing
             await event.edit(
                 message,
-                parse_mode='md',  # Use markdown for image link
+                parse_mode='html',  # Use HTML parsing
                 link_preview=True,  # Enable link preview for image
                 buttons=buttons
             )
@@ -183,17 +183,17 @@ async def handle_create_other(event):
             # Get buttons from buttons.py
             buttons = get_otc_created_buttons(result["invite_url"])
             
-            # Create message with markdown image link at bottom
+            # Create message with HTML formatting
             message = OTHER_CREATED_MESSAGE.format(
-                GROUP_NAME=group_name,
+                GROUP_NUMBER=group_number,
                 GROUP_INVITE_LINK=result["invite_url"],
                 OTC_IMAGE=OTC_IMAGE
             )
             
-            # EDIT the existing message with markdown parsing
+            # EDIT the existing message with HTML parsing
             await event.edit(
                 message,
-                parse_mode='md',  # Use markdown for image link
+                parse_mode='html',  # Use HTML parsing
                 link_preview=True,  # Enable link preview for image
                 buttons=buttons
             )
