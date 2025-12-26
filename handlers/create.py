@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create escrow handlers - Version with images and captions
+Create escrow handlers - Simple version without media
 """
 from telethon.sessions import StringSession
 from telethon.tl import functions, types
@@ -16,10 +16,6 @@ import time
 
 # Channel ID for logging
 LOG_CHANNEL_ID = -1003631543074
-
-# Image URLs from config
-OTC_IMAGE = "https://files.catbox.moe/f6lzpr.png"
-P2P_IMAGE = "https://files.catbox.moe/ieiejo.png"
 
 # Define get_next_number locally
 def get_next_number(group_type="p2p"):
@@ -62,7 +58,7 @@ async def handle_create(event):
 
 async def handle_create_p2p(event):
     """
-    Handle P2P deal selection with animation and image
+    Handle P2P deal selection with animation
     """
     try:
         # Get user mention
@@ -73,11 +69,11 @@ async def handle_create_p2p(event):
         
         # Create animation sequence
         animation_messages = [
-       f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘚𝘦𝘤𝘶𝘳𝘦 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Establishing transaction environment. {mention}</blockquote>",
-       f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘚𝘦𝘤𝘶𝘳𝘦 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Configuring secure channel.. {mention}</blockquote>",
-       f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘚𝘦𝘤𝘶𝘳𝘦 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Finalizing security protocols... {mention}</blockquote>",
-       f"𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘯𝘷𝘪𝘳𝘰𝘯𝘮𝘦𝘯𝘵 𝘙𝘦𝘢𝘥𝘺\n\n<blockquote>Secure transaction channel established</blockquote>"
-    ]
+            f"<b>🔐 Creating P2P Escrow</b>\n\n<blockquote>Creating group please wait {mention}.</blockquote>",
+            f"<b>🔐 Creating P2P Escrow</b>\n\n<blockquote>Creating group please wait {mention}..</blockquote>",
+            f"<b>🔐 Creating P2P Escrow</b>\n\n<blockquote>Creating group please wait {mention}...</blockquote>",
+            f"<b>✅ P2P Escrow Created</b>\n\n<blockquote>Finalizing setup...</blockquote>"
+        ]
         
         # Show animation
         for msg in animation_messages:
@@ -99,35 +95,26 @@ async def handle_create_p2p(event):
         if result and "invite_url" in result:
             from utils.texts import P2P_CREATED_MESSAGE
             
-            # Create caption with join button
-            caption = P2P_CREATED_MESSAGE.format(
+            # Create message with join button
+            message = P2P_CREATED_MESSAGE.format(
                 GROUP_NAME=group_name,
                 GROUP_INVITE_LINK=result["invite_url"]
             )
             
+            # Only show join button
             join_button = [
                 [Button.url("🔗 Join Group Now", result["invite_url"])]
             ]
             
-            # Send image with caption
-            try:
-                await event.delete()  # Delete the animation message
-                await event.client.send_file(
-                    event.chat_id,
-                    P2P_IMAGE,
-                    caption=caption,
-                    parse_mode='html',
-                    buttons=join_button,
-                    link_preview=False
-                )
-            except:
-                # Fallback to text message if image fails
-                await event.edit(
-                    caption,
-                    parse_mode='html',
-                    link_preview=False,
-                    buttons=join_button
-                )
+            # EDIT the existing message (don't send new one)
+            await event.edit(
+                message,
+                parse_mode='html',
+                link_preview=False,
+                buttons=join_button
+            )
+            
+            print(f"[SUCCESS] P2P Escrow created: {group_name}")
             
         else:
             await event.edit(
@@ -146,7 +133,7 @@ async def handle_create_p2p(event):
 
 async def handle_create_other(event):
     """
-    Handle OTC deal selection with animation and image
+    Handle OTC deal selection with animation
     """
     try:
         # Get user mention
@@ -157,11 +144,11 @@ async def handle_create_other(event):
         
         # Create animation sequence
         animation_messages = [
-          f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘖𝘛𝘊 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Initializing secure environment. {mention}</blockquote>",
-          f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘖𝘛𝘊 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Configuring transaction parameters.. {mention}</blockquote>",
-          f"𝘊𝘳𝘦𝘢𝘵𝘪𝘯𝘨 𝘖𝘛𝘊 𝘌𝘴𝘤𝘳𝘰𝘸\n\n<blockquote>Finalizing security protocols... {mention}</blockquote>",
-          f"𝘖𝘛𝘊 𝘌𝘴𝘤𝘳𝘰𝘸 𝘌𝘴𝘵𝘢𝘣𝘭𝘪𝘴𝘩𝘦𝘥\n\n<blockquote>Secure OTC channel ready</blockquote>"
-   ]
+            f"<b>🔐 Creating OTC Escrow</b>\n\n<blockquote>Creating group please wait {mention}.</blockquote>",
+            f"<b>🔐 Creating OTC Escrow</b>\n\n<blockquote>Creating group please wait {mention}..</blockquote>",
+            f"<b>🔐 Creating OTC Escrow</b>\n\n<blockquote>Creating group please wait {mention}...</blockquote>",
+            f"<b>✅ OTC Escrow Created</b>\n\n<blockquote>Finalizing setup...</blockquote>"
+        ]
         
         # Show animation
         for msg in animation_messages:
@@ -183,35 +170,26 @@ async def handle_create_other(event):
         if result and "invite_url" in result:
             from utils.texts import OTHER_CREATED_MESSAGE
             
-            # Create caption with join button
-            caption = OTHER_CREATED_MESSAGE.format(
+            # Create message with join button
+            message = OTHER_CREATED_MESSAGE.format(
                 GROUP_NAME=group_name,
                 GROUP_INVITE_LINK=result["invite_url"]
             )
             
+            # Only show join button
             join_button = [
                 [Button.url("🔗 Join Group Now", result["invite_url"])]
             ]
             
-            # Send image with caption
-            try:
-                await event.delete()  # Delete the animation message
-                await event.client.send_file(
-                    event.chat_id,
-                    OTC_IMAGE,
-                    caption=caption,
-                    parse_mode='html',
-                    buttons=join_button,
-                    link_preview=False
-                )
-            except:
-                # Fallback to text message if image fails
-                await event.edit(
-                    caption,
-                    parse_mode='html',
-                    link_preview=False,
-                    buttons=join_button
-                )
+            # EDIT the existing message (don't send new one)
+            await event.edit(
+                message,
+                parse_mode='html',
+                link_preview=False,
+                buttons=join_button
+            )
+            
+            print(f"[SUCCESS] OTC Escrow created: {group_name}")
             
         else:
             await event.edit(
@@ -413,7 +391,6 @@ async def send_log_to_channel(user_client, group_name, group_type, creator, chat
         
         # Send to log channel
         try:
-            # Try to send to channel
             await user_client.send_message(
                 LOG_CHANNEL_ID,
                 log_message,
