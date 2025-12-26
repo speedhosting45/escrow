@@ -1,6 +1,9 @@
 from telethon import Button
 
-# Main menu buttons
+# ======================================================
+# MAIN MENU BUTTONS
+# ======================================================
+
 def get_main_menu_buttons():
     return [
         [
@@ -13,7 +16,11 @@ def get_main_menu_buttons():
         ]
     ]
 
-# Create escrow type buttons
+
+# ======================================================
+# CREATE ESCROW TYPE BUTTONS
+# ======================================================
+
 def get_create_buttons():
     return [
         [
@@ -25,45 +32,59 @@ def get_create_buttons():
         ]
     ]
 
-# Back button for various sections
+
+# ======================================================
+# BACK BUTTON (COMMON)
+# ======================================================
+
 def get_back_button():
     return [
         [Button.inline("𝘉𝘢𝘤𝘬", b"back_to_main")]
     ]
+
+
+# ======================================================
+# ESCROW CREATED BUTTONS (P2P / OTC)
+# ======================================================
+
 def get_p2p_created_buttons(invite_url):
-    """Get buttons for P2P created message"""
-    # Create KeyboardButtonCopy for copy functionality
-    copy_button = KeyboardButtonCopy(
-        text="📋 Copy Link",
-        copy_text=invite_url
-    )
-    
+    """
+    Buttons shown after P2P escrow group creation
+    """
     return [
         [
             Button.url("🔗 Join Now", invite_url),
             Button.url("📤 Share", f"https://t.me/share/url?url={invite_url}")
         ],
-        [copy_button]  # This is the actual copy button
+        [
+            Button.inline("📋 Copy Link", b"copy_invite_link")
+        ]
     ]
+
 
 def get_otc_created_buttons(invite_url):
-    """Get buttons for OTC created message"""
-    # Create KeyboardButtonCopy for copy functionality
-    copy_button = KeyboardButtonCopy(
-        text="📋 Copy Link",
-        copy_text=invite_url
-    )
-    
+    """
+    Buttons shown after OTC escrow group creation
+    """
     return [
         [
             Button.url("🔗 Join Now", invite_url),
             Button.url("📤 Share", f"https://t.me/share/url?url={invite_url}")
         ],
-        [copy_button]  # This is the actual copy button
+        [
+            Button.inline("📋 Copy Link", b"copy_invite_link")
+        ]
     ]
 
+
+# ======================================================
+# ROLE SELECTION BUTTONS
+# ======================================================
+
 def get_session_buttons(group_key):
-    """Get buttons for session initiation"""
+    """
+    Buyer / Seller role selection buttons
+    """
     return [
         [
             Button.inline("🧑‍💼 Buyer", f"role_buyer_{group_key}".encode()),
