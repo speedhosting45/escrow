@@ -48,14 +48,14 @@ def get_p2p_created_buttons(invite_url):
     """Get buttons for P2P created message"""
     # Create KeyboardButtonCopy for copy functionality
     copy_button = KeyboardButtonCopy(
-        text="📋 Copy Link",
+        text="Copy Link",
         copy_text=invite_url
     )
     
     return [
         [
-            Button.url("🔗 Join Now", invite_url),
-            Button.url("📤 Share", f"https://t.me/share/url?url={invite_url}")
+            Button.url("Join", invite_url),
+            Button.url("Share", f"https://t.me/share/url?url={invite_url}")
         ],
         [copy_button]  # This is the actual copy button
     ]
