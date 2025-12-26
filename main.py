@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Escrow Bot - Complete version with fixes
+Main entry point for the Escrow Bot - Simple and clean
 """
 import asyncio
 import logging
 import sys
 from telethon import TelegramClient, events, Button
-from telethon.tl import functions, types
 import json
 import os
 import time
@@ -26,15 +25,15 @@ from handlers.help import handle_help
 from utils.texts import (
     START_MESSAGE, CREATE_MESSAGE, P2P_CREATED_MESSAGE, OTHER_CREATED_MESSAGE,
     WELCOME_MESSAGE, SESSION_INITIATED_MESSAGE, INSUFFICIENT_MEMBERS_MESSAGE,
-    SESSION_ALREADY_INITIATED_MESSAGE, GROUP_NOT_FOUND_MESSAGE, ERROR_MESSAGE
+    SESSION_ALREADY_INITIATED_MESSAGE, GROUP_NOT_FOUND_MESSAGE
 )
 from utils.buttons import get_main_menu_buttons
 
 # Setup logging
 logging.basicConfig(
-    format='[%(asctime)s] %(levelname)s: %(message)s',
+    format='[%(asctime)s] %(message)s',
     level=logging.INFO,
-    datefmt='%Y-%m-%d %H:%M:%S'
+    datefmt='%H:%M:%S'
 )
 logger = logging.getLogger(__name__)
 
@@ -124,7 +123,6 @@ class EscrowBot:
                     parse_mode='html'
                 )
             except Exception as e:
-                logger.error(f"Error in back handler: {e}")
                 await event.answer("❌ An error occurred.", alert=True)
         
         # Handle /begin command
@@ -132,132 +130,45 @@ class EscrowBot:
         async def begin_handler(event):
             await self.handle_begin_command(event)
         
-        # Handle role selection buttons
+        # Handle role selection
         @self.client.on(events.CallbackQuery(pattern=rb'role_'))
         async def role_handler(event):
             await self.handle_role_selection(event)
         
-        # Main message handler
+        # Delete system messages only
         @self.client.on(events.NewMessage)
         async def handle_all_messages(event):
-            """Handle all messages"""
+            """Delete system messages only"""
             try:
                 message_text = event.text or ""
                 
-                # Skip if no text
-                if not message_text:
-                    return
+                # Check if system message
+                is_system = False
+                if event.sender_id == 777000 or event.sender_id == 1087968824:
+                    is_system = True
+                elif any(pattern in message_text.lower() for pattern in [
+                    "joined the group", "was added", "created the group", 
+                    "left the group", "pinned a message"
+                ]):
+                    is_system = True
                 
-                # Get chat info
-                try:
-                    chat = await event.get_chat()
-                    chat_id = str(chat.id)
-                    chat_title = getattr(chat, 'title', 'Unknown')
-                except:
-                    return
-                
-                # Get user info
-                try:
-                    user = await event.get_sender()
-                    if not user:
-                        return
-                except:
-                    return
-                
-                # Skip if from bot
-                if hasattr(user, 'bot') and user.bot:
-                    return
-                
-                # Clean chat ID
-                if chat_id.startswith('-100'):
-                    clean_chat_id = chat_id[4:]
-                else:
-                    clean_chat_id = chat_id
-                
-                # Load groups
-                groups = load_groups()
-                
-                # Find group
-                group_data = None
-                group_key = None
-                
-                if clean_chat_id in groups:
-                    group_data = groups[clean_chat_id]
-                    group_key = clean_chat_id
-                elif chat_id in groups:
-                    group_data = groups[chat_id]
-                    group_key = chat_id
-                else:
-                    for key, data in groups.items():
-                        if data.get("name") == chat_title:
-                            group_data = data
-                            group_key = key
-                            break
-                
-                # Skip if not our group
-                if not group_data:
-                    return
-                
-                # Delete system messages
-                if self.is_system_message(event, message_text):
+                if is_system:
                     try:
                         await event.delete()
                     except:
                         pass
-                    return
-                
-                # Handle /begin
-                if message_text == '/begin':
-                    try:
-                        await event.delete()  # Delete /begin message
-                    except:
-                        pass
-                    await self.handle_begin_command(event)
-                    return
                     
-            except Exception as e:
-                # Silently ignore errors
+            except:
                 pass
-    
-    def is_system_message(self, event, message_text):
-        """Check if message is a system message"""
-        # From Telegram
-        if event.sender_id == 777000 or event.sender_id == 1087968824:
-            return True
-        
-        # System patterns
-        system_patterns = [
-            "joined the group via invite link",
-            "was added",
-            "created the group",
-            "added ",
-            "left the group",
-            "pinned a message",
-            "changed the group",
-            "was removed",
-            "has joined"
-        ]
-        
-        message_lower = message_text.lower()
-        for pattern in system_patterns:
-            if pattern in message_lower:
-                return True
-        
-        return False
     
     async def handle_begin_command(self, event):
         """Handle /begin command"""
         try:
-            # Get chat info
+            # Get chat and user
             chat = await event.get_chat()
+            user = await event.get_sender()
             chat_id = str(chat.id)
             chat_title = getattr(chat, 'title', 'Unknown')
-            
-            # Get user
-            try:
-                user = await event.get_sender()
-            except:
-                return
             
             # Clean chat ID
             if chat_id.startswith('-100'):
@@ -286,7 +197,7 @@ class EscrowBot:
             
             if not group_data:
                 try:
-                    await event.respond(GROUP_NOT_FOUND_MESSAGE, parse_mode='html')
+                    await event.reply(GROUP_NOT_FOUND_MESSAGE, parse_mode='html')
                 except:
                     pass
                 return
@@ -294,7 +205,7 @@ class EscrowBot:
             # Check if already initiated
             if group_data.get("session_initiated", False):
                 try:
-                    await event.respond(SESSION_ALREADY_INITIATED_MESSAGE, parse_mode='html')
+                    await event.reply(SESSION_ALREADY_INITIATED_MESSAGE, parse_mode='html')
                 except:
                     pass
                 return
@@ -324,12 +235,12 @@ class EscrowBot:
                 if member_count < 2:
                     try:
                         message = INSUFFICIENT_MEMBERS_MESSAGE.format(current_count=member_count)
-                        await event.respond(message, parse_mode='html')
+                        await event.reply(message, parse_mode='html')
                     except:
                         pass
                     return
                 
-                # Update members list
+                # Update members
                 group_data["members"] = [u.id for u in real_users]
                 groups[group_key] = group_data
                 save_groups(groups)
@@ -362,21 +273,16 @@ class EscrowBot:
                     buttons=buttons
                 )
                 
-                # Update group data
+                # Update group
                 group_data["session_initiated"] = True
                 group_data["session_message_id"] = sent_message.id
                 groups[group_key] = group_data
                 save_groups(groups)
                 
                 print(f"[SUCCESS] Session initiated in {chat_title}")
-                print(f"[PARTICIPANTS] {display_text}")
                 
             except Exception as e:
-                print(f"[ERROR] In /begin: {e}")
-                try:
-                    await event.respond(ERROR_MESSAGE, parse_mode='html')
-                except:
-                    pass
+                print(f"[ERROR] /begin: {e}")
                 
         except Exception as e:
             print(f"[ERROR] Handling /begin: {e}")
@@ -470,7 +376,7 @@ class EscrowBot:
                 parse_mode='html'
             )
             
-            print(f"[ROLE] {get_user_display(sender)} selected as {role_name} in {chat_title}")
+            print(f"[ROLE] {get_user_display(sender)} selected as {role_name}")
             
             # Check if both roles selected
             buyer_count = sum(1 for u in roles[group_id].values() if u.get("role") == "buyer")
@@ -508,7 +414,7 @@ class EscrowBot:
 <b>Seller:</b> {seller['name']}
 </blockquote>
 
-<b>Next:</b> Wallet setup initiated.
+<b>Next:</b> Proceed to wallet setup.
 """
             
             await self.client.send_message(
@@ -517,7 +423,7 @@ class EscrowBot:
                 parse_mode='html'
             )
             
-            print(f"[SETUP] Wallet setup started for group: {group_id}")
+            print(f"[SETUP] Both roles confirmed")
             
         except Exception as e:
             print(f"[ERROR] Sending setup: {e}")
@@ -546,10 +452,9 @@ class EscrowBot:
             
             print("\n🚀 FEATURES:")
             print("   • P2P & OTC Escrow Creation")
-            print("   • Creator as Anonymous Admin")
-            print("   • Auto-delete System Messages")
-            print("   • Role Selection System")
-            print("   • Channel Logging")
+            print("   • Simple interface")
+            print("   • Role selection")
+            print("   • Channel logging")
             print("\n📡 Bot is ready...")
             print("   Ctrl+C to stop\n")
             
@@ -560,8 +465,6 @@ class EscrowBot:
             print("\n👋 Bot stopped")
         except Exception as e:
             print(f"\n❌ Error: {e}")
-            import traceback
-            traceback.print_exc()
         finally:
             print("\n🔴 Shutdown complete")
 
@@ -576,13 +479,8 @@ def main():
         # Run bot
         loop = asyncio.get_event_loop()
         loop.run_until_complete(bot.run())
-    except RuntimeError as e:
-        if "Event loop is closed" in str(e):
-            print("\n👋 Bot stopped")
-        else:
-            print(f"\n❌ Error: {e}")
-            import traceback
-            traceback.print_exc()
+    except RuntimeError:
+        print("\n👋 Bot stopped")
     except KeyboardInterrupt:
         print("\n👋 Bot stopped")
 
