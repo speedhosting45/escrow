@@ -1,4 +1,5 @@
 from telethon import Button
+from telethon.tl.types import KeyboardButtonCopy
 
 # ======================================================
 # MAIN MENU BUTTONS
