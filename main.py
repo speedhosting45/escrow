@@ -384,23 +384,44 @@ class EscrowBot:
             await event.answer("❌ Error selecting role", alert=True)
     
     async def send_wallet_setup(self, chat, group_id, user_roles):
-        """Send wallet setup message"""
-        try:
-            # Find buyer and seller
-            buyer = None
-            seller = None
-            
-            for user_id, data in user_roles.items():
-                if data.get("role") == "buyer" and not buyer:
-                    buyer = data
-                elif data.get("role") == "seller" and not seller:
-                    seller = data
-            
-            if not buyer or not seller:
-                return
-            
-            # Send message
-            message = f"""
+    """Send wallet setup message and update group photo"""
+    try:
+        # Find buyer and seller
+        buyer = None
+        seller = None
+        
+        for user_id, data in user_roles.items():
+            if data.get("role") == "buyer" and not buyer:
+                buyer = data
+            elif data.get("role") == "seller" and not seller:
+                seller = data
+        
+        if not buyer or not seller:
+            return
+        
+        # Generate custom logo
+        from utils.logo_generator import LogoGenerator
+        
+        generator = LogoGenerator()
+        success, image_bytes, message = generator.generate_logo(
+            buyer['name'],
+            seller['name']
+        )
+        
+        if success:
+            try:
+                # Update group photo with generated logo
+                await self.client.upload_profile_photo(
+                    chat,
+                    file=image_bytes
+                )
+                print(f"[LOGO] Group photo updated with buyer: {buyer['name']}, seller: {seller['name']}")
+            except Exception as e:
+                print(f"[WARNING] Could not update group photo: {e}")
+                # Continue even if photo update fails
+        
+        # Send confirmation message
+        message = f"""
 <b>✅ Participants Confirmed</b>
 
 <blockquote>
@@ -408,20 +429,21 @@ class EscrowBot:
 <b>Seller:</b> {seller['name']}
 </blockquote>
 
-<b>Next:</b> Proceed to wallet setup.
-"""
-            
-            await self.client.send_message(
-                chat,
-                message,
-                parse_mode='html'
-            )
-            
-            print(f"[SETUP] Both roles confirmed")
-            
-        except Exception as e:
-            print(f"[ERROR] Sending setup: {e}")
+<b>Status:</b> Custom logo has been generated for this escrow session.
 
+<b>Next Step:</b> Wallet setup will begin shortly.
+"""
+        
+        await self.client.send_message(
+            chat,
+            message,
+            parse_mode='html'
+        )
+        
+        print(f"[SETUP] Both roles confirmed in group ID: {group_id}")
+        
+    except Exception as e:
+        print(f"[ERROR] Sending setup: {e}")
     async def run(self):
         """Run the bot"""
         try:
