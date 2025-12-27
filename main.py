@@ -435,8 +435,7 @@ class EscrowBot:
             # Send confirmation message
             group_type_display = "P2P" if group_type == "p2p" else "OTC"
             
-            message = f"""
-<b>✅ Participants Confirmed</b>
+            message_text = f"""<b>✅ Participants Confirmed</b>
 
 <blockquote>
 <b>Type:</b> {group_type_display} Escrow
@@ -446,12 +445,11 @@ class EscrowBot:
 
 <b>Status:</b> Custom {group_type_display} logo has been generated.
 
-<b>Next Step:</b> Wallet setup will begin shortly.
-"""
+<b>Next Step:</b> Wallet setup will begin shortly."""
             
             await self.client.send_message(
                 chat,
-                message,
+                message_text,
                 parse_mode='html'
             )
             
