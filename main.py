@@ -424,7 +424,13 @@ class EscrowBot:
                     print(f"[PARTICIPANTS] Buyer: {buyer['name']}, Seller: {seller['name']}")
                 except Exception as e:
                     print(f"[WARNING] Could not update group photo: {e}")
-                    # Continue even if photo update fails
+                    # Save logo to file for debugging
+                    try:
+                        with open(f"debug_{group_type}_logo.png", "wb") as f:
+                            f.write(image_bytes.getvalue())
+                        print(f"[DEBUG] Logo saved as debug_{group_type}_logo.png")
+                    except:
+                        pass
             
             # Send confirmation message
             group_type_display = "P2P" if group_type == "p2p" else "OTC"
