@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Escrow Bot - With proper imports
+Main entry point for the Escrow Bot - Fixed version
 """
 import asyncio
 import logging
